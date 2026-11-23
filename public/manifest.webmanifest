@@ -1,0 +1,38 @@
+{
+  "id": "/",
+  "name": "ErikrafT SSTV",
+  "short_name": "SSTV",
+  "description": "Decodificador e codificador SSTV direto no navegador.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#00001a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/ErikrafT-SSTV-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ErikrafT-SSTV-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ErikrafT-SSTV-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/ErikrafT-SSTV_LogoV1.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
