@@ -50,6 +50,29 @@ function validateDimensions(width, height) {
   return { width, height };
 }
 
+function parseGif(bytes) {
+  if (bytes.length < 10) return null;
+  const signature = ascii(bytes, 0, 6);
+  if (signature !== "GIF87a" && signature !== "GIF89a") return null;
+  return validateDimensions(readUint16LE(bytes, 6), readUint16LE(bytes, 8));
+}
+
+function parseBmp(bytes) {
+  if (bytes.length < 26 || ascii(bytes, 0, 2) !== "BM") return null;
+  const dibSize = readUint32LE(bytes, 14);
+
+  if (dibSize === 12) {
+    return validateDimensions(readUint16LE(bytes, 18), readUint16LE(bytes, 20));
+  }
+
+  if (dibSize < 40 || bytes.length < 26) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const width = view.getInt32(18, true);
+  const rawHeight = view.getInt32(22, true);
+  if (rawHeight === -2147483648) return null;
+  return validateDimensions(width, Math.abs(rawHeight));
+}
+
 function parsePng(bytes) {
   if (
     bytes.length < 24 ||
@@ -167,6 +190,8 @@ export function parseImageDimensions(bytes, mimeType) {
   if (mimeType === "image/png") dimensions = parsePng(bytes);
   else if (mimeType === "image/jpeg") dimensions = parseJpeg(bytes);
   else if (mimeType === "image/webp") dimensions = parseWebp(bytes);
+  else if (mimeType === "image/gif") dimensions = parseGif(bytes);
+  else if (mimeType === "image/bmp" || mimeType === "image/x-ms-bmp") dimensions = parseBmp(bytes);
 
   if (!dimensions) {
     throw new TypeError("The image header is invalid or its dimensions could not be verified.");
