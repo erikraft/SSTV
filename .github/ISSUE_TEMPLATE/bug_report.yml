@@ -1,0 +1,91 @@
+name: Bug report
+description: Report a problem with SSTV decoding, encoding, microphone capture, or the interface.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ErikrafT SSTV. Please include enough detail to reproduce the issue.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected feature
+      options:
+        - SSTV Decoder
+        - SSTV Encoder
+        - Microphone capture
+        - Audio playback
+        - Interface or browser compatibility
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: "e.g. Chrome 131, Firefox 132, Safari 18"
+    validations:
+      required: true
+  - type: input
+    id: operating_system
+    attributes:
+      label: Operating system and device
+      placeholder: "e.g. Android 13, Windows 11, Linux Mint"
+    validations:
+      required: true
+  - type: dropdown
+    id: fft_quality
+    attributes:
+      label: FFT quality (decoder)
+      options:
+        - Ultra fast · FFT 64
+        - Very fast · FFT 128
+        - Fast · FFT 256
+        - Balanced · FFT 512 (default)
+        - Good quality · FFT 1024
+        - High quality · FFT 2048
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that cause the problem.
+      placeholder: |
+        1. Open the decoder.
+        2. Select an audio recording.
+        3. Press Decode SSTV.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      placeholder: Describe what should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the exact error message, if one appears.
+    validations:
+      required: true
+  - type: textarea
+    id: audio_sample
+    attributes:
+      label: Optional SSTV audio sample
+      description: |
+        You may attach a short WAV/OGG/MP3 sample by dragging it into this field. Issues in this repository are public: only share audio you own and are allowed to publish. Remove private conversations, names, phone numbers, and other personal information.
+      placeholder: |
+        Optional: attach the recording here.
+        If you cannot share the file, provide its format, sample rate, duration, and known SSTV mode.
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I confirm that any attached recording is safe to share publicly and contains no private or sensitive information.
+          required: true

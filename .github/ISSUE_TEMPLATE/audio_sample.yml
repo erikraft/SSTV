@@ -1,0 +1,51 @@
+name: SSTV audio sample for decoder testing
+description: Share a public-safe SSTV recording that can help reproduce or investigate a decoding issue.
+title: "[Audio sample]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Important:** this is a public issue. Do not upload recordings containing private conversations, personal information, or audio you do not have permission to publish.
+  - type: input
+    id: source
+    attributes:
+      label: Recording source
+      placeholder: "e.g. radio receiver, web recording, SSTV test generator"
+    validations:
+      required: true
+  - type: input
+    id: file_details
+    attributes:
+      label: File format, sample rate, and duration
+      placeholder: "e.g. WAV, 44.1 kHz, 38 seconds"
+    validations:
+      required: true
+  - type: input
+    id: expected_mode
+    attributes:
+      label: Expected SSTV mode (if known)
+      placeholder: "e.g. Robot36, Martin 1, Scottie 1, unknown"
+    validations:
+      required: false
+  - type: textarea
+    id: symptom
+    attributes:
+      label: What happens when decoding?
+      description: Mention whether the image is blank, shifted, noisy, incomplete, or incorrectly colored.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Audio attachment
+      description: Drag the audio file into this field. Keep the original file unmodified if possible.
+      placeholder: Attach the audio file here.
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Permission
+      options:
+        - label: I own this recording or have permission to share it publicly, and it contains no private or sensitive information.
+          required: true

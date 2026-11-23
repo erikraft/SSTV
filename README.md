@@ -5,15 +5,15 @@ Browser-based SSTV Decoder & Encoder. Audio decoding and image encoding run loca
 ## Features
 - Decode SSTV audio recordings supported by the browser, with line-by-line live image reconstruction while the audio plays.
 - Record SSTV audio from the microphone with browser echo cancellation, noise suppression, and automatic gain control options.
-- Automatic VIS detection and manual mode override: Robot 36/72, Martin 1/2, Scottie 1/2/DX.
+- Automatic VIS detection for Robot 36/72, Martin 1/2, Scottie 1/2/DX.
 - FFT quality control, progress, decoded image download, and local browser history.
-- Encode images into Martin 1 / Martin 2 WAV audio, play the generated transmission, and show a Matrix-inspired animation while it plays.
+- Encode images into Martin 1 / Martin 2 WAV audio and play the generated transmission.
 
 ## Development
 Run `npm install`, `npm run dev`, and `npm run build`.
 
 ## Credits
-Decoder implementation adapted from https://github.com/Equinoxis/sstv-decoder. Manual mode selection follows https://github.com/Equinoxis/sstv-decoder/pull/1/commits. See THIRD_PARTY_NOTICES.md.
+Decoder implementation adapted from https://github.com/Equinoxis/sstv-decoder. See THIRD_PARTY_NOTICES.md.
 
 ## Browser permissions and limits
 

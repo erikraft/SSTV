@@ -14,13 +14,12 @@ self.onmessage = async (event) => {
     return;
   }
 
-  const { samples, sampleRate, fftSize, forcedMode } = request;
+  const { samples, sampleRate, fftSize } = request;
   const decoder = new SSTVDecoder(
     samples,
     sampleRate,
     fftSize,
     (progress) => self.postMessage({ type: "progress", progress }),
-    forcedMode,
     (width, height, mode) => {
       self.postMessage({ type: "start", width, height, mode });
     },
