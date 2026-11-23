@@ -873,6 +873,7 @@ async function handleAudioFile(file) {
     return true;
   } catch (error) {
     URL.revokeObjectURL(nextAudioUrl);
+    if (loadGeneration !== audioLoadGeneration) return false;
     console.error("Error decoding audio file:", error);
     showErrorMessage(error instanceof Error ? error.message : "Failed to decode the audio file.");
     return false;
@@ -920,7 +921,10 @@ async function startMicrophoneCapture() {
       "audio/ogg;codecs=opus",
       "audio/mp4",
     ];
-    const mimeType = mimeCandidates.find((type) => MediaRecorder.isTypeSupported(type));
+    const mimeType =
+      typeof MediaRecorder.isTypeSupported === "function"
+        ? mimeCandidates.find((type) => MediaRecorder.isTypeSupported(type))
+        : null;
     microphoneRecorder = new MediaRecorder(
       microphoneStream,
       mimeType ? { mimeType } : undefined
