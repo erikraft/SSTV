@@ -28,6 +28,8 @@ input.addEventListener("change", () => {
   audioPlayback.pause();
   audioPlayback.hidden = true;
   audioPlayback.removeAttribute("src");
+  link.hidden = true;
+  link.removeAttribute("href");
   previewWrap.classList.remove("is-transmitting");
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl);

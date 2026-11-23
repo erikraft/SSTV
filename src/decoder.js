@@ -777,8 +777,8 @@ dropZone.addEventListener("dragleave", () =>
 dropZone.addEventListener("drop", (event) => {
   event.preventDefault();
   dropZone.classList.remove("active");
-  const file = event.dataTransfer.files[0];
-  if (file) handleAudioFile(file);
+  const file = event.dataTransfer.files?.[0];
+  if (file) void handleAudioFile(file);
 });
 
 async function handleAudioFile(file) {
@@ -1044,12 +1044,19 @@ decodeButton.addEventListener("click", () => {
   const fftQuality = Number(qualitySelect.value);
   const forcedMode = modeSelect?.value === "auto" ? null : Number(modeSelect.value);
 
-  decoderWorker.postMessage({
-    samples: currentSamples,
-    sampleRate: currentSampleRate,
-    fftSize: fftQuality,
-    forcedMode,
-  });
+  try {
+    decoderWorker.postMessage({
+      samples: currentSamples,
+      sampleRate: currentSampleRate,
+      fftSize: fftQuality,
+      forcedMode,
+    });
+  } catch (error) {
+    console.error("Could not start decoder worker:", error);
+    hideDecodeProgress();
+    showErrorMessage("Could not start decoding. The audio may exceed this device's available memory.");
+    decodeButton.disabled = !decodeHistoryReady;
+  }
 });
 
 decoderWorker.onmessage = (event) => {
@@ -1063,6 +1070,18 @@ decoderWorker.onmessage = (event) => {
   }
 
   if (data.type === "start") {
+    if (
+      !Number.isInteger(data.width) ||
+      !Number.isInteger(data.height) ||
+      data.width <= 0 ||
+      data.height <= 0 ||
+      data.width * data.height > 16_000_000
+    ) {
+      hideDecodeProgress();
+      showErrorMessage("The decoder returned invalid image dimensions.");
+      decodeButton.disabled = !decodeHistoryReady;
+      return;
+    }
     canvas.width = data.width;
     canvas.height = data.height;
     ctx.clearRect(0, 0, data.width, data.height);

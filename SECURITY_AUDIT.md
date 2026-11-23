@@ -143,11 +143,11 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - Leitura dos arquivos de entrada, encoder, decoder, Worker, decoder SSTV, IndexedDB, consentimento, pacote e configuração Vercel.
 - Busca no código por padrões comuns de segredos e APIs/endpoints.
 - Revisão dos metadados dos commits recentes.
-- Testes unitários adicionados para a validação estrita do payload do Worker (`node --test`).
+- Cinco testes unitários da validação estrita do payload do Worker executados com Node.js em ambiente isolado: 5 passaram, 0 falharam. O helper e os casos de teste foram executados sem instalar as dependências Vite do projeto.
 
 ### Não executado / não verificável
 
-- `npm audit`: não executado nesta sessão.
+- `npm audit`: não executado nesta sessão; não há lockfile versionado.
 - Build Vite e testes em navegador real: dependem de instalação e execução local/CI; não são declarados como aprovados neste relatório.
 - Teste físico de microfone, cancelamento de eco, diferentes codecs de MediaRecorder e autoplay em Android/iOS/desktop.
 - Teste com arquivos SSTV de referência para todos os modos e comparação de pixels do decoder.
