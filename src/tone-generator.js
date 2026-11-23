@@ -6,12 +6,14 @@
  * @param {number[]} output
  * @returns {(frequency: number, durationSeconds: number) => void}
  */
+import { appendTone } from "./encoder-audio.js";
+
 export function createToneWriter(sampleRate, output) {
   if (!Number.isSafeInteger(sampleRate) || sampleRate < 8000 || !Array.isArray(output)) {
     throw new TypeError("Invalid SSTV tone writer configuration.");
   }
 
-  let phase = 0;
+  const phase = { value: 0 };
   let fractionalSamples = 0;
 
   return (frequency, durationSeconds) => {
@@ -23,12 +25,7 @@ export function createToneWriter(sampleRate, output) {
     const exactSamples = durationSeconds * sampleRate + fractionalSamples;
     const sampleCount = Math.max(1, Math.round(exactSamples));
     fractionalSamples = exactSamples - sampleCount;
-
-    for (let index = 0; index < sampleCount; index++) {
-      output.push(Math.sin(phase) * 0.72);
-      phase += (2 * Math.PI * frequency) / sampleRate;
-      if (phase >= Math.PI * 2) phase %= Math.PI * 2;
-    }
+    appendTone(output, phase, frequency, sampleCount / sampleRate, sampleRate);
   };
 }
 
