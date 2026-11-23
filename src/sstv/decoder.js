@@ -62,6 +62,27 @@ class SSTVDecoder {
     return barycentricPeakInterp(spectrum, peakBin) * binWidth;
   }
 
+  _tonePower(data, frequency) {
+    if (!data || data.length < 8) return 0;
+    const window = hannWindow(data.length);
+    const coefficient = 2 * Math.cos((2 * Math.PI * frequency) / this.sampleRate);
+    let previous = 0;
+    let previousPrevious = 0;
+
+    for (let index = 0; index < data.length; index++) {
+      const current =
+        coefficient * previous - previousPrevious + data[index] * window[index];
+      previousPrevious = previous;
+      previous = current;
+    }
+
+    const power =
+      previous * previous +
+      previousPrevious * previousPrevious -
+      coefficient * previous * previousPrevious;
+    return Number.isFinite(power) ? Math.max(0, power) : 0;
+  }
+
   _findHeader() {
     const headerSize = Math.round(HDR_SIZE * this.sampleRate);
     const windowSize = Math.round(HDR_WINDOW_SIZE * this.sampleRate);
@@ -86,7 +107,43 @@ class SSTVDecoder {
         Math.abs(f2 - 1200) < 85 &&
         Math.abs(f3 - 1900) < 65 &&
         Math.abs(f4 - 1200) < 85
-      ) return offset + headerSize;
+      ) {
+        const expectedTones = [
+          [leader1Start, 1900],
+          [breakStart, 1200],
+          [leader2Start, 1900],
+          [visStart, 1200],
+        ];
+        const refineRadius = Math.round(0.01 * this.sampleRate);
+        const refineStep = Math.max(1, Math.round(0.00025 * this.sampleRate));
+        const lastOffset = Math.min(
+          offset + refineRadius,
+          this.samples.length - headerSize
+        );
+        let bestOffset = offset;
+        let bestScore = -Infinity;
+
+        for (
+          let candidate = Math.max(0, offset - refineRadius);
+          candidate <= lastOffset;
+          candidate += refineStep
+        ) {
+          let score = 0;
+          for (const [windowStart, frequency] of expectedTones) {
+            const segment = this.samples.slice(
+              candidate + windowStart,
+              candidate + windowStart + windowSize
+            );
+            score += this._tonePower(segment, frequency);
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestOffset = candidate;
+          }
+        }
+
+        return bestOffset + headerSize;
+      }
     }
     throw new Error("SSTV header not found in audio.");
   }

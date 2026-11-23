@@ -40,11 +40,17 @@ for (const [visCode, expectedName] of [
   [76, "Scottie DX"],
 ]) {
   test(`automatically detects ${expectedName} after leading silence`, async () => {
-    const samples = makeSstvHeader(visCode);
+    const sampleRate = 11025;
+    const samples = makeSstvHeader(visCode, sampleRate);
     let detectedMode = null;
     const decoder = new SSTVDecoder(samples, 11025, 512, () => {}, (_w, _h, name) => {
       detectedMode = name;
     });
+    const headerEnd = decoder._findHeader();
+    assert.ok(
+      Math.abs(headerEnd / sampleRate - (0.123 + 0.64)) < 0.001,
+      "header alignment should be within one millisecond"
+    );
     await decoder.decode();
     assert.equal(detectedMode, expectedName);
   });
@@ -60,4 +66,16 @@ test("parabolic peak interpolation estimates a fractional FFT bin", () => {
 test("rejects audio without an SSTV header", async () => {
   const decoder = new SSTVDecoder(new Float32Array(11025), 11025, 512);
   await assert.rejects(() => decoder.decode(), /header not found/);
+});
+
+test("refines automatic header alignment at 44.1 kHz", () => {
+  const sampleRate = 44100;
+  const decoder = new SSTVDecoder(
+    makeSstvHeader(44, sampleRate),
+    sampleRate,
+    512
+  );
+  const headerEnd = decoder._findHeader();
+  assert.ok(Math.abs(headerEnd / sampleRate - (0.123 + 0.64)) < 0.001);
+  assert.equal(decoder._decodeVIS(headerEnd).NAME, "Martin 1");
 });
