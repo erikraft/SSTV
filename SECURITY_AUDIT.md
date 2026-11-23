@@ -181,9 +181,9 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 
 - **Criticidade:** MÉDIA (confiabilidade e disponibilidade do processamento local).
 - **Confiança:** CONFIRMADA quanto às fragilidades algorítmicas no código; a causa exata da gravação que o usuário decodificou permanece NÃO VERIFICÁVEL sem o arquivo original.
-- **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições; e a função de interpolação de pico em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
+- **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições, e o primeiro candidato compatível podia ser aceito antes do início real do líder, deslocando o ponto inicial da imagem; e a função de interpolação de pico em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
 - **Impacto plausível:** interferência forte fora da banda SSTV, bordas de tom ou estimativas de frequência imprecisas podem atrapalhar a identificação do cabeçalho/VIS e a leitura de tons de pixel, gerando falha ou imagem degradada.
-- **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; refina o início real do cabeçalho com pontuação Goertzel dos quatro tons do preâmbulo (sem deslocar a imagem alguns milissegundos); usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`.
+- **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; refina o início real do cabeçalho com pontuação Goertzel dos quatro tons do preâmbulo (sem deslocar a imagem alguns milissegundos); usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`. A busca inicial usa passos de 5 ms e a etapa de refinamento usa passos de 0,25 ms.
 - **Limitação:** não foi fornecido o áudio que reproduziu o problema. Testes sintéticos de cabeçalho/VIS não substituem a validação com a gravação original.
 
 ### Revisão do PR upstream Equinoxis/sstv-decoder#1
@@ -212,6 +212,11 @@ O PR contém um único commit (`afd07ebf96da8223a06773a55e2cfb3f1656a3da`). Ele 
 | A08 Software or Data Integrity Failures | Não foi encontrado carregador remoto de código ou mecanismo de atualização dinâmica. Dependências de build continuam sujeitas à resolução do npm sem lockfile. |
 | A09 Security Logging and Alerting Failures | Sem backend ou alertas centralizados; erros são tratados localmente no navegador. |
 | A10 Mishandling of Exceptional Conditions | Payload inválido e falhas do Worker recebem tratamento; o pico de memória nativo antes da validação do áudio continua como risco residual. |
+
+### Testes e limites da auditoria complementar
+
+- Foram adicionados 11 casos sintéticos ao teste do decoder: detecção dos sete VIS modes, cabeçalho com e sem silêncio inicial, alinhamento em 44,1 kHz, interpolação parabólica e rejeição de áudio sem cabeçalho.
+- Uma simulação isolada do algoritmo com sinais sintéticos em 11.025, 44.100 e 48.000 Hz, com zero e 123 ms de silêncio inicial, mediu erro de alinhamento inferior a 0,3 ms. Isso não equivale à execução de `npm test` nem valida uma gravação real.
 
 ### Limites da auditoria complementar
 
