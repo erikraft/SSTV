@@ -23,6 +23,7 @@ const downloadImageButton = document.getElementById("downloadImageButton");
 const feedbackCard = document.getElementById("feedbackCard");
 const errorMessage = document.getElementById("errorMessage");
 const CONTACT_URL = "https://mathieurenaud.fr/";
+const MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024;
 
 function escapeHtml(text) {
   return String(text)
@@ -754,6 +755,12 @@ dropZone.addEventListener("drop", (event) => {
 });
 
 function handleAudioFile(file) {
+  if (file.size > MAX_AUDIO_FILE_SIZE) {
+    showErrorMessage("Audio file is too large. The maximum supported size is 50 MB.");
+    return;
+  }
+
+  hideErrorMessage();
   currentSourceFileName = file.name;
   dropZone.classList.add("has-file");
   audioFileNameDisplay.replaceChildren(document.createTextNode("Selected file: "));
