@@ -1,3 +1,4 @@
+import { createToneWriter, applyTransmissionEdgeFade } from "./tone-generator.js";
 import {
   readImageDimensions,
   MAX_IMAGE_FILE_SIZE,
