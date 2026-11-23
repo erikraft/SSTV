@@ -300,6 +300,20 @@
             </label>
           </div>
 
+          <div class="microphone-controls" role="group" aria-label="Microphone input">
+            <div class="microphone-controls__actions">
+              <button type="button" id="microphoneStartButton" class="app-btn-secondary">Use microphone</button>
+              <button type="button" id="microphoneStopButton" class="app-btn-primary" disabled>Stop &amp; decode</button>
+              <button type="button" id="feedbackSuppressionButton" class="app-btn-secondary" aria-pressed="true">Feedback suppression: ON</button>
+            </div>
+            <label class="microphone-controls__playback">
+              <input type="checkbox" id="playAudioWhileDecoding" checked />
+              Play audio while decoding
+            </label>
+            <audio id="decodeAudioPlayback" class="microphone-controls__audio" controls hidden></audio>
+            <p id="microphoneStatus" class="text-sm text-app-muted" role="status" aria-live="polite">You can upload an audio file or record a transmission with your microphone.</p>
+          </div>
+
           <div class="flex flex-wrap items-center justify-center gap-3">
             <button type="button" id="decodeButton" class="app-btn-primary">
               Decode SSTV
@@ -394,7 +408,7 @@
             </p>
           </div>
         </section>
-<section class="app-panel mt-6 flex w-full flex-col gap-4 p-4 sm:p-6" aria-labelledby="encoder-heading"><div class="text-center"><h2 id="encoder-heading" class="text-lg font-semibold tracking-tight text-app-text">SSTV Encoder</h2><p class="mt-1 text-sm text-app-muted">Convert an image into a downloadable SSTV WAV audio signal.</p></div><div class="encoder-grid"><label class="file-drop-zone" for="imageInput"><span class="file-drop-zone__title">Choose an image</span><span class="file-drop-zone__hint">PNG, JPEG, or WebP · processed locally</span><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden><p class="file-drop-zone__filename" id="imageFileName">No image selected</p></label><div class="encoder-options"><label class="sstv-quality-field__label" for="encodeMode">Encoding mode</label><select id="encodeMode" class="app-select app-select--full"><option value="44" selected>Martin 1 · 320 × 256</option><option value="40">Martin 2 · 320 × 256</option></select><button type="button" id="encodeButton" class="app-btn-primary" disabled>Encode SSTV</button><a id="downloadAudio" class="app-btn-secondary" hidden download="erikraft-sstv.wav">Download WAV</a><p id="encodeStatus" class="text-sm text-app-muted" role="status">Select an image to begin.</p></div></div><canvas id="encodePreview" class="encoder-preview" width="320" height="256" aria-label="Image preview"></canvas></section>
+<section class="app-panel mt-6 flex w-full flex-col gap-4 p-4 sm:p-6" aria-labelledby="encoder-heading"><div class="text-center"><h2 id="encoder-heading" class="text-lg font-semibold tracking-tight text-app-text">SSTV Encoder</h2><p class="mt-1 text-sm text-app-muted">Convert an image into a downloadable SSTV WAV audio signal and play the transmission.</p></div><div class="encoder-grid"><label class="file-drop-zone" for="imageInput"><span class="file-drop-zone__title">Choose an image</span><span class="file-drop-zone__hint">PNG, JPEG, or WebP · processed locally</span><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden><p class="file-drop-zone__filename" id="imageFileName">No image selected</p></label><div class="encoder-options"><label class="sstv-quality-field__label" for="encodeMode">Encoding mode</label><select id="encodeMode" class="app-select app-select--full"><option value="44" selected>Martin 1 · 320 × 256</option><option value="40">Martin 2 · 320 × 256</option></select><button type="button" id="encodeButton" class="app-btn-primary" disabled>Encode SSTV</button><a id="downloadAudio" class="app-btn-secondary" hidden download="erikraft-sstv.wav">Download WAV</a><audio id="encodeAudioPlayback" class="encoder-audio-player" controls hidden></audio><p id="encodeStatus" class="text-sm text-app-muted" role="status">Select an image to begin.</p></div></div><div class="encoder-preview-wrap" id="encoderPreviewWrap"><canvas id="encodePreview" class="encoder-preview" width="320" height="256" aria-label="Image preview"></canvas><div class="encoder-matrix" aria-hidden="true">01001101 01000001 01010100 01010010 01001001 01011000 01010011 01010011 01010100 01010110 01000101 01001110 01000011 01001111 01000100 01000101</div></div></section>
       </main>
 
       <article
@@ -745,11 +759,11 @@
               <li>
                 <strong>LinkedIn</strong>:
                 <a
-                  href="https://www.linkedin.com/in/mathieu-renaud-inge"
+                  href="https://www.linkedin.com/in/erikraft/"
                   class="seo-doc-a"
                   target="_blank"
                   rel="noopener noreferrer"
-                  >https://www.linkedin.com/in/mathieu-renaud-inge</a
+                  >https://www.linkedin.com/in/erikraft/</a
                 >
               </li>
             </ul>
@@ -797,7 +811,7 @@
           >
           <span class="text-app-border-strong"> · </span>
           <a
-            href="https://www.linkedin.com/in/mathieu-renaud-inge"
+            href="https://www.linkedin.com/in/erikraft/"
             class="text-app-accent underline decoration-app-accent/30 underline-offset-2 transition-colors hover:text-app-accent-hover"
             rel="noopener noreferrer"
             >LinkedIn</a
