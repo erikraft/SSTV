@@ -67,23 +67,15 @@ test("rejects a file whose header does not match the declared image type", async
 });
 
 test("reads GIF logical screen dimensions", () => {
-  const bytes = new Uint8Array([
-    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x40, 0x01, 0x00, 0x01,
-  ]);
-  assert.deepEqual(parseImageDimensions(bytes, "image/gif"), {
-    width: 320,
-    height: 1,
-  });
+  const bytes = new Uint8Array([..."GIF89a"].map((char) => char.charCodeAt(0)).concat([0x40, 0x01, 0x00, 0x01]));
+  assert.deepEqual(parseImageDimensions(bytes, "image/gif"), { width: 320, height: 256 });
 });
 
-test("reads BMP dimensions and normalizes top-down height", () => {
+test("reads BMP dimensions and handles top-down images", () => {
   const bytes = new Uint8Array(54);
   bytes.set([0x42, 0x4d], 0);
   new DataView(bytes.buffer).setUint32(14, 40, true);
   new DataView(bytes.buffer).setInt32(18, 320, true);
   new DataView(bytes.buffer).setInt32(22, -256, true);
-  assert.deepEqual(parseImageDimensions(bytes, "image/bmp"), {
-    width: 320,
-    height: 256,
-  });
+  assert.deepEqual(parseImageDimensions(bytes, "image/bmp"), { width: 320, height: 256 });
 });

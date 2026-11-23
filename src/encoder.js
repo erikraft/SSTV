@@ -1,10 +1,10 @@
+import { createToneWriter, applyTransmissionEdgeFade } from "./tone-generator.js";
 import {
   readImageDimensions,
   MAX_IMAGE_FILE_SIZE,
   MAX_IMAGE_PIXELS,
   MAX_IMAGE_DIMENSION,
 } from "./image-validation.js";
-import { appendTone } from "./encoder-audio.js";
 
 const input = document.getElementById("imageInput");
 const name = document.getElementById("imageFileName");
@@ -15,65 +15,45 @@ const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
-const cropZoom = document.getElementById("cropZoom");
-const cropX = document.getElementById("cropX");
-const cropY = document.getElementById("cropY");
-const cropZoomValue = document.getElementById("cropZoomValue");
-const cropXValue = document.getElementById("cropXValue");
-const cropYValue = document.getElementById("cropYValue");
-const cropControls = document.getElementById("cropControls");
+const framing = document.getElementById("imageFraming");
+const positionX = document.getElementById("imagePositionX");
+const positionY = document.getElementById("imagePositionY");
+const positionControls = document.getElementById("imagePositionControls");
 
 let image = null;
 let objectUrl = null;
 let imageLoadGeneration = 0;
 
-function getCropRect() {
-  if (!image) return null;
-  const width = image.naturalWidth;
-  const height = image.naturalHeight;
-  const targetRatio = canvas.width / canvas.height;
-  let sourceWidth = width;
-  let sourceHeight = height;
-
-  if (width / height > targetRatio) sourceWidth = height * targetRatio;
-  else sourceHeight = width / targetRatio;
-
-  const zoom = Math.max(1, Number(cropZoom?.value || 100) / 100);
-  sourceWidth /= zoom;
-  sourceHeight /= zoom;
-  const maxX = Math.max(0, width - sourceWidth);
-  const maxY = Math.max(0, height - sourceHeight);
-  return {
-    x: maxX * (Number(cropX?.value || 50) / 100),
-    y: maxY * (Number(cropY?.value || 50) / 100),
-    width: sourceWidth,
-    height: sourceHeight,
-  };
-}
-
-function renderPreview() {
+function renderImagePreview() {
   if (!image) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    positionControls.hidden = true;
     return;
   }
-  const crop = getCropRect();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height,
-    0, 0, canvas.width, canvas.height);
+
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const fill = framing.value === "cover";
+  const scale = (fill ? Math.max : Math.min)(
+    canvas.width / width,
+    canvas.height / height
+  );
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  const horizontal = Number(positionX.value) / 100;
+  const vertical = Number(positionY.value) / 100;
+  const x = (canvas.width - drawWidth) * (fill ? horizontal : 0.5);
+  const y = (canvas.height - drawHeight) * (fill ? vertical : 0.5);
+
+  ctx.fillStyle = "#08090c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, x, y, drawWidth, drawHeight);
+  positionControls.hidden = !fill;
 }
 
-function updateCropLabels() {
-  if (cropZoomValue) cropZoomValue.textContent = `${cropZoom.value}%`;
-  if (cropXValue) cropXValue.textContent = `${cropX.value}%`;
-  if (cropYValue) cropYValue.textContent = `${cropY.value}%`;
-}
-
-for (const control of [cropZoom, cropX, cropY]) {
-  control?.addEventListener("input", () => {
-    updateCropLabels();
-    renderPreview();
-  });
-}
+framing.addEventListener("change", renderImagePreview);
+positionX.addEventListener("input", renderImagePreview);
+positionY.addEventListener("input", renderImagePreview);
 
 input.addEventListener("change", async () => {
   const file = input.files?.[0];
@@ -82,7 +62,7 @@ input.addEventListener("change", async () => {
   const loadGeneration = ++imageLoadGeneration;
   image = null;
   button.disabled = true;
-  if (cropControls) cropControls.hidden = true;
+  renderImagePreview();
 
   audioPlayback.pause();
   audioPlayback.hidden = true;
@@ -96,7 +76,7 @@ input.addEventListener("change", async () => {
   }
 
   if (
-    !["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp"].includes(file.type) ||
+    !["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-ms-bmp"].includes(file.type) ||
     file.size <= 0 ||
     file.size > MAX_IMAGE_FILE_SIZE
   ) {
@@ -105,7 +85,7 @@ input.addEventListener("change", async () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (cropControls) cropControls.hidden = true;
     status.textContent =
-      "Choose a PNG, JPEG, WebP, GIF, or BMP image smaller than 15 MB.";
+      "Choose a supported raster image (PNG, JPEG, WebP, GIF, or BMP) smaller than 15 MB.";
     input.value = "";
     return;
   }
@@ -159,17 +139,12 @@ input.addEventListener("change", async () => {
     }
 
     image = img;
-    if (cropZoom) cropZoom.value = "100";
-    if (cropX) cropX.value = "50";
-    if (cropY) cropY.value = "50";
-    updateCropLabels();
-    renderPreview();
-    if (cropControls) cropControls.hidden = false;
+    renderImagePreview();
 
     URL.revokeObjectURL(url);
     name.textContent = file.name;
     button.disabled = false;
-    status.textContent = "Ready to encode locally.";
+    status.textContent = "Image ready. Adjust the framing, then encode locally.";
     link.hidden = true;
   };
 
@@ -236,8 +211,7 @@ button.addEventListener("click", async () => {
     const scan = vis === 40 ? 0.073216 : 0.146432;
     const pixel = scan / 320;
     const samples = [];
-    const phase = { value: 0 };
-    const tone = (freq, seconds) => appendTone(samples, phase, freq, seconds, rate);
+    const tone = createToneWriter(rate, samples);
 
     tone(1900, 0.3);
     tone(1200, 0.01);
@@ -276,6 +250,7 @@ button.addEventListener("click", async () => {
       tone(1500, 0.000572);
     }
 
+    applyTransmissionEdgeFade(samples, rate);
     const blob = makeWav(samples, rate);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(blob);

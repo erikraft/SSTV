@@ -1,6 +1,6 @@
-## MIT-licensed third-party decoder components
+## Aviso de licença de terceiros
 
-Portions of the decoder are derived from software distributed under the MIT License. The original copyright notice and full license text are retained below as required by that license.
+Partes do código do decoder foram adaptadas de software distribuído sob a licença MIT. Nenhum código de seleção manual de modo foi incluído. O aviso de copyright e o texto integral da licença abaixo foram mantidos conforme exigido pela licença.
 
 Copyright (c) Mathieu Renaud
 

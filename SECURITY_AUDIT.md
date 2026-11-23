@@ -231,33 +231,48 @@ A implementação mantém a detecção automática do modo SSTV pelo cabeçalho 
 
 ---
 
-## 7. Auditoria complementar — encoder, enquadramento e referências externas
+## 7. Auditoria complementar — encoder, enquadramento e formatos de imagem
 
-### SSTV-08 — Rampa de volume aplicada individualmente a cada pixel transmitido
+- **Base desta revisão:** branch `fix/encoder-audio-timing-image-framing`, derivada de `main`.
+- **Escopo:** `src/encoder.js`, `src/image-validation.js`, `src/tone-generator.js`, `src/encoder.css`, markup do encoder, testes e dependências/configuração já descritas acima.
+- **Sem requisições contra produção e sem upload de arquivos do usuário.**
 
-- **Criticidade:** ALTA para a integridade da imagem codificada (não é execução remota).
+### SSTV-08 — Sinal de pixel praticamente abafado e deriva temporal na codificação
+
+- **Criticidade:** ALTA para a funcionalidade de codificação; não é uma vulnerabilidade de acesso remoto.
+- **Confiança:** CONFIRMADA pelo código.
+- **Evidência na base:** em `src/encoder.js`, a função local `tone()` aplicava `Math.min(1, i / 24, (n - i) / 24)` em toda chamada. Cada pixel Martin 1 dura aproximadamente 5 amostras a 11.025 Hz; portanto, a rampa de 24 amostras abrangia mais do que a duração inteira de cada pixel, reduzindo drasticamente a amplitude. O mesmo código arredondava separadamente a quantidade de amostras de cada pixel (`Math.round(seconds * rate)`), acumulando erro de duração ao longo da linha e da imagem.
+- **Impacto:** transmissão com imagem severamente degradada, faixas e cores incorretas ao decodificar o WAV gerado.
+- **Correção proposta nesta PR:** gerador de tons com fase contínua e acumulador de amostras fracionárias; sem fade por pixel; fade curto somente nas extremidades do WAV completo.
+- **Teste adicionado:** verifica a duração total de 320 pixels em Martin 1 e Martin 2 e confirma que o sinal não fica próximo do silêncio.
+
+### SSTV-09 — Validação de formatos de imagem incompleta
+
+- **Criticidade:** BAIXA (limitação funcional com endurecimento de entrada).
 - **Confiança:** CONFIRMADA.
-- **Evidência:** `src/encoder.js` aplicava uma janela de ataque/decay de 24 amostras em cada chamada de `tone()`. No modo Martin 2, um pixel dura aproximadamente 2,52 amostras a 11.025 Hz; no Martin 1, aproximadamente 5,04 amostras. A rampa reduzia a amplitude de praticamente todos os pixels.
-- **Impacto:** os tons que representam a intensidade de cada pixel chegavam com amplitude reduzida, prejudicando a recuperação da imagem ao decodificar o WAV gerado.
-- **Correção:** gerador de tons com fase contínua e sem envelope individual por pixel; teste dedicado para amplitude de tons curtos e continuidade de fase.
+- **Evidência na base:** `src/encoder.js` aceitava somente `image/png`, `image/jpeg` e `image/webp`; `src/image-validation.js` somente interpretava cabeçalhos desses três formatos.
+- **Impacto:** GIF e BMP válidos eram recusados mesmo quando o navegador poderia renderizá-los.
+- **Correção proposta nesta PR:** suporte a GIF e BMP, com leitura limitada do cabeçalho e validação das dimensões antes da decodificação de pixels. Mantêm-se os limites de 15 MB, 8192 pixels por dimensão e 16 megapixels. SVG e formatos sem parser de cabeçalho seguro não são aceitos nesta alteração.
 
-### SSTV-09 — Enquadramento automático fixo sem controles de recorte
+### SSTV-10 — Enquadramento automático sem controle manual
 
-- **Criticidade:** BAIXA (qualidade funcional).
+- **Criticidade:** BAIXA (limitação funcional).
 - **Confiança:** CONFIRMADA.
-- **Evidência:** o encoder aplicava um recorte central fixo para preencher 320 × 256, sem controles para ajustar zoom ou posição.
-- **Impacto:** partes importantes de imagens com proporções diferentes podiam ser cortadas sem possibilidade de ajuste.
-- **Correção:** prévia com recorte automático central e controles de zoom, posição horizontal e vertical. A proporção permanece 320 × 256, conforme os modos Martin 1 e Martin 2 disponíveis.
+- **Evidência na base:** `src/encoder.js` sempre usava escala `Math.max(320 / width, 256 / height)` e centralizava a imagem, cortando partes que excediam o quadro sem permitir reposicionamento ou modo de ajuste integral.
+- **Impacto:** o usuário não podia escolher qual parte de uma imagem fora da proporção 320×256 seria transmitida nem preservar a imagem inteira com margens.
+- **Correção proposta nesta PR:** seleção entre preencher/cortar e ajustar a imagem inteira; controles horizontais e verticais para reposicionar o recorte; o preview e os pixels lidos pelo encoder usam o mesmo canvas, evitando diferença entre pré-visualização e áudio.
 
-### SSTV-10 — Formatos de imagem raster limitados
+### Revisão de referências externas e licenças
 
-- **Criticidade:** BAIXA (compatibilidade).
-- **Confiança:** CONFIRMADA.
-- **Evidência:** a validação pré-decodificação aceitava apenas PNG, JPEG e WebP.
-- **Correção:** inclusão de GIF e BMP com leitura limitada de cabeçalho e validação de dimensões antes da decodificação. SVG permanece excluído por ser um formato vetorial ativo e não necessário ao fluxo de SSTV.
+- Não foi encontrada referência a Play Store no conteúdo do encoder, README ou aviso de terceiros revisados.
+- Foi removida a referência incorreta à PR de seleção manual do projeto upstream, pois essa alteração não está incluída.
+- O aviso de copyright e a licença MIT do decoder upstream foram mantidos. Removê-los seria incompatível com a obrigação de preservar o aviso de copyright e a permissão da licença para partes substanciais do código adaptado. A atribuição legal não significa que o projeto pertença ao upstream.
 
-### Limites desta revisão
+### Segurança e supply chain — estado desta revisão
 
-- O áudio original que produziu a imagem corrompida não foi fornecido; a correção foi baseada no defeito demonstrável no encoder e em testes unitários sintéticos.
-- Não foi executado `npm test`, build Vite ou `npm audit` nesta sessão. Os novos testes foram adicionados ao repositório, mas ainda precisam ser executados em CI.
-- O processamento continua no navegador e sem upload de arquivos.
+- As entradas de imagem continuam limitadas por tamanho, dimensões e quantidade de pixels antes da criação do elemento `Image`; os cabeçalhos dos formatos adicionados são verificados antes da decodificação.
+- Não foi introduzido backend, upload remoto, autenticação, banco remoto, webhook ou endpoint de custo por uso.
+- O `package.json` continua sem lockfile versionado. `npm audit` e build não foram executados nesta revisão; não há base para declarar dependências livres de vulnerabilidades.
+- A validação com o WAV real que originou a segunda imagem permanece pendente, pois o áudio não foi anexado. O defeito de geração foi confirmado estaticamente e coberto por testes determinísticos, mas a gravação original não pôde ser reproduzida.
+
+**Limites:** esta revisão não comprova configurações privadas da Vercel, WAF/DNS, secrets do painel, nem a ausência de segredos em todos os blobs históricos do Git. Não foram executados testes contra produção.
