@@ -27,6 +27,7 @@ let imageLoadGeneration = 0;
 function renderImagePreview() {
   if (!image) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    positionControls.hidden = true;
     return;
   }
 
@@ -61,6 +62,7 @@ input.addEventListener("change", async () => {
   const loadGeneration = ++imageLoadGeneration;
   image = null;
   button.disabled = true;
+  renderImagePreview();
 
   audioPlayback.pause();
   audioPlayback.hidden = true;
