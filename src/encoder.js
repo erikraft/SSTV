@@ -76,7 +76,6 @@ input.addEventListener("change", async () => {
   }
 
   if (
-    !["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-ms-bmp"].includes(file.type) ||
     file.size <= 0 ||
     file.size > MAX_IMAGE_FILE_SIZE
   ) {
