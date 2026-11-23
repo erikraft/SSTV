@@ -167,3 +167,58 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - Verificação em buscadores/crawlers de metadados SEO.
 
 **Conclusão:** a auditoria do código versionado identificou e corrigiu problemas concretos de permissões, validação de entrada, tratamento de erro e construção DOM. Não há evidência no repositório atual de backend exposto, autenticação quebrada, IDOR, mass assignment, webhook ou banco remoto aberto. A auditoria de dependências e a varredura histórica completa de segredos permanecem pendentes e não devem ser tratadas como aprovadas.
+
+
+---
+
+## 6. Auditoria complementar após o merge da PR #5
+
+- **Base revisada em modo somente leitura:** `7082cbb0c27070f2fc3bee5241451d167cd68406`.
+- **Escopo adicional:** seletor de modo, detecção VIS, estimativa de frequência FFT, mensagens do Worker, efeito Matrix e formulário de feedback.
+- **Sem testes contra produção:** nenhuma rota ou serviço de produção foi chamado.
+
+### SSTV-07 — Detecção automática sensível ao alinhamento e a ruído fora da banda
+
+- **Criticidade:** MÉDIA (confiabilidade e disponibilidade do processamento local).
+- **Confiança:** CONFIRMADA quanto às fragilidades algorítmicas no código; a causa exata da gravação que o usuário decodificou permanece NÃO VERIFICÁVEL sem o arquivo original.
+- **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições; e a função `barycentricPeakInterp` em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
+- **Impacto plausível:** interferência forte fora da banda SSTV, bordas de tom ou estimativas de frequência imprecisas podem atrapalhar a identificação do cabeçalho/VIS e a leitura de tons de pixel, gerando falha ou imagem degradada.
+- **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`.
+- **Limitação:** não foi fornecido o áudio que reproduziu o problema. Testes sintéticos de cabeçalho/VIS não substituem a validação com a gravação original.
+
+### Revisão do PR upstream Equinoxis/sstv-decoder#1
+
+O PR contém um único commit (`afd07ebf96da8223a06773a55e2cfb3f1656a3da`). Ele adiciona seleção manual de modo VIS e, quando o modo é forçado, chama `_decodeImageData(0)`, ignorando o offset calculado do cabeçalho/VIS. Essa alteração não foi copiada. O ErikrafT SSTV mantém a detecção automática original e calcula o início da imagem após o cabeçalho.
+
+### Cinco verificações prioritárias
+
+1. **Rate limit/consumo:** não existem endpoints de servidor para login, OTP, IA, e-mail ou SMS. O processamento local continua limitado a 50 MB, 10 minutos e 30 milhões de amostras. Risco residual: `decodeAudioData()` descomprime antes da validação de duração.
+2. **IDOR/BOLA:** nenhum endpoint recebe IDs de recursos remotos de usuários.
+3. **Mass assignment:** não há backend que persista corpos de requisição.
+4. **Webhooks:** não há integração de pagamentos ou webhooks.
+5. **Banco aberto:** não há Supabase/Firebase, migrations SQL ou regras RLS/Firestore/Storage versionadas. IndexedDB é local ao navegador.
+
+### OWASP Top 10:2025
+
+| Categoria | Resultado |
+|---|---|
+| A01 Broken Access Control | Nenhum endpoint privado, sessão, função administrativa, IDOR ou SSRF foi encontrado na SPA estática. |
+| A02 Security Misconfiguration | CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy e Permissions-Policy estão definidos em `vercel.json`. `style-src 'unsafe-inline'` permanece como endurecimento futuro; não foi demonstrada exploração. |
+| A03 Software Supply Chain Failures | Lockfile ausente. `npm audit` não foi executado; não se afirma que as dependências estejam livres de advisories. |
+| A04 Cryptographic Failures | Não foi identificado armazenamento de credenciais, pagamento ou dados sensíveis em backend. |
+| A05 Injection | Mensagens de erro usam DOM seguro/`textContent`; não foram identificados SQL, comandos de sistema ou avaliação dinâmica. |
+| A06 Insecure Design | Limites de áudio/imagem permanecem; a detecção VIS e a estimativa de frequência receberam endurecimento. |
+| A07 Authentication Failures | Não existe autenticação no produto. |
+| A08 Software or Data Integrity Failures | Não foi encontrado carregador remoto de código ou mecanismo de atualização dinâmica. Dependências de build continuam sujeitas à resolução do npm sem lockfile. |
+| A09 Security Logging and Alerting Failures | Sem backend ou alertas centralizados; erros são tratados localmente no navegador. |
+| A10 Mishandling of Exceptional Conditions | Payload inválido e falhas do Worker recebem tratamento; o pico de memória nativo antes da validação do áudio continua como risco residual. |
+
+### Limites da auditoria complementar
+
+- `npm audit` não foi executado: o repositório não possui lockfile e a sessão não teve acesso de rede ao npm registry para gerar um sem alterar a resolução das dependências.
+- `npm run build` não foi executado porque as dependências não estão instaladas nesta sessão.
+- O áudio original que apresentou a imagem bugada não foi fornecido; não é possível confirmar que a correção reproduza exatamente o caso relatado.
+- Não foram executados testes contra produção, auditoria de painel Vercel, scanner histórico completo de segredos ou análise de infraestrutura externa.
+- Nenhuma CVE ou vulnerabilidade de dependência foi inventada.
+
+**Conclusão complementar:** a superfície de ataque continua limitada a uma SPA estática e ao processamento local. A correção mantém a detecção automática sem o seletor manual, remove o efeito Matrix e endurece a estimativa de frequência. A auditoria de supply chain e a validação com o áudio real permanecem pendentes.

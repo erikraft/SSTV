@@ -8,7 +8,6 @@ test("accepts a bounded valid decoder request", () => {
     samples,
     sampleRate: 8000,
     fftSize: 512,
-    forcedMode: null,
   });
   assert.equal(request.samples, samples);
   assert.equal(request.sampleRate, 8000);
@@ -21,11 +20,10 @@ test("rejects non-Float32Array input", () => {
   );
 });
 
-test("rejects unsupported sample rates, FFT sizes, and modes", () => {
+test("rejects unsupported sample rates and FFT sizes", () => {
   const samples = new Float32Array(8);
   assert.throws(() => validateDecodeRequest({ samples, sampleRate: 1000, fftSize: 512 }), /sample rate/);
   assert.throws(() => validateDecodeRequest({ samples, sampleRate: 8000, fftSize: 999 }), /FFT size/);
-  assert.throws(() => validateDecodeRequest({ samples, sampleRate: 8000, fftSize: 512, forcedMode: 999 }), /mode/);
 });
 
 test("rejects audio exceeding the maximum duration", () => {

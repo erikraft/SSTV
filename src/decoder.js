@@ -23,7 +23,6 @@ const audioFileNameDisplay = document.getElementById("audioFileNameDisplay");
 const canvas = document.getElementById("sstvCanvas");
 const ctx = canvas.getContext("2d");
 const qualitySelect = document.getElementById("qualitySelect");
-const modeSelect = document.getElementById("modeSelect");
 const decodeButton = document.getElementById("decodeButton");
 const downloadImageButton = document.getElementById("downloadImageButton");
 const feedbackCard = document.getElementById("feedbackCard");
@@ -1042,14 +1041,11 @@ decodeButton.addEventListener("click", () => {
   }
 
   const fftQuality = Number(qualitySelect.value);
-  const forcedMode = modeSelect?.value === "auto" ? null : Number(modeSelect.value);
-
   try {
     decoderWorker.postMessage({
       samples: currentSamples,
       sampleRate: currentSampleRate,
       fftSize: fftQuality,
-      forcedMode,
     });
   } catch (error) {
     console.error("Could not start decoder worker:", error);

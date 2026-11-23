@@ -1,11 +1,9 @@
-.encoder-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:1rem;align-items:start}.encoder-options{display:flex;flex-direction:column;gap:.75rem}.encoder-preview{display:block;width:min(100%,640px);height:auto;max-height:480px;object-fit:contain;margin:0 auto;border:1px solid var(--app-border);border-radius:12px;background:#08090c}#downloadAudio[hidden]{display:none}@media(max-width:640px){.encoder-grid{grid-template-columns:1fr}.encoder-preview{max-height:320px}}
+.encoder-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:1rem;align-items:start}
+.encoder-options{display:flex;flex-direction:column;gap:.75rem}
+.encoder-preview{display:block;width:min(100%,640px);height:auto;max-height:480px;object-fit:contain;margin:0 auto;border:1px solid var(--app-border);border-radius:12px;background:#08090c}
+#downloadAudio[hidden]{display:none}
+@media(max-width:640px){.encoder-grid{grid-template-columns:1fr}.encoder-preview{max-height:320px}}
 .encoder-preview-wrap{position:relative;width:min(100%,640px);margin:0 auto;overflow:hidden;border:1px solid var(--app-border);border-radius:12px;background:#08090c}
 .encoder-preview-wrap .encoder-preview{width:100%;max-height:480px;margin:0;border:0;border-radius:0}
-.encoder-matrix{position:absolute;inset:-15% 0;display:grid;place-items:center;overflow:hidden;padding:1rem;pointer-events:none;color:#4ade80;font-family:ui-monospace,SFMono-Regular,monospace;font-size:clamp(10px,1.8vw,18px);font-weight:700;line-height:1.45;letter-spacing:.3em;overflow-wrap:anywhere;text-align:center;text-shadow:0 0 7px #22c55e,0 0 18px #16a34a;opacity:0;background:repeating-linear-gradient(0deg,transparent 0 5px,rgba(34,197,94,.12) 6px 7px);mix-blend-mode:screen}
-.encoder-preview-wrap.is-transmitting .encoder-preview{animation:encoderImageDissolve 1.15s ease-in-out infinite alternate}
-.encoder-preview-wrap.is-transmitting .encoder-matrix{opacity:.88;animation:encoderMatrixRain .65s linear infinite}
 .encoder-audio-player{display:block;width:min(100%,640px);margin:.85rem auto 0}
 .encoder-audio-player[hidden]{display:none}
-@keyframes encoderImageDissolve{from{filter:brightness(1) saturate(1);opacity:1}to{filter:brightness(.18) saturate(.35);opacity:.38}}
-@keyframes encoderMatrixRain{from{transform:translateY(-5%)}to{transform:translateY(5%)}}
-@media(prefers-reduced-motion:reduce){.encoder-preview-wrap.is-transmitting .encoder-preview,.encoder-preview-wrap.is-transmitting .encoder-matrix{animation:none}.encoder-preview-wrap.is-transmitting .encoder-matrix{opacity:.35}}

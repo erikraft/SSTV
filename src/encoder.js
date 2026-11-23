@@ -14,7 +14,6 @@ const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
-const previewWrap = document.getElementById("encoderPreviewWrap");
 
 let image = null;
 let objectUrl = null;
@@ -33,7 +32,7 @@ input.addEventListener("change", async () => {
   audioPlayback.removeAttribute("src");
   link.hidden = true;
   link.removeAttribute("href");
-  previewWrap.classList.remove("is-transmitting");
+
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl);
     objectUrl = null;
@@ -170,7 +169,7 @@ button.addEventListener("click", async () => {
   link.hidden = true;
   audioPlayback.pause();
   audioPlayback.hidden = true;
-  previewWrap.classList.remove("is-transmitting");
+
   status.textContent = "Generating SSTV audio…";
   await new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -238,15 +237,13 @@ button.addEventListener("click", async () => {
 
     audioPlayback.src = objectUrl;
     audioPlayback.hidden = false;
-    audioPlayback.onplay = () => previewWrap.classList.add("is-transmitting");
-    audioPlayback.onended = () => previewWrap.classList.remove("is-transmitting");
-    audioPlayback.onpause = () => previewWrap.classList.remove("is-transmitting");
-    previewWrap.classList.add("is-transmitting");
+
+
 
     const playback = audioPlayback.play();
     if (playback && typeof playback.catch === "function") {
         playback.catch(() => {
-        previewWrap.classList.remove("is-transmitting");
+
         status.textContent += " · Press Play to listen to the generated transmission.";
       });
     }
