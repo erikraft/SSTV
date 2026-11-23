@@ -1,6 +1,205 @@
-const input=document.getElementById("imageInput"),name=document.getElementById("imageFileName"),mode=document.getElementById("encodeMode"),button=document.getElementById("encodeButton"),link=document.getElementById("downloadAudio"),status=document.getElementById("encodeStatus"),canvas=document.getElementById("encodePreview"),ctx=canvas.getContext("2d");
-let image=null,objectUrl=null;
-input.addEventListener("change",()=>{const file=input.files?.[0];if(!file)return;if(!["image/png","image/jpeg","image/webp"].includes(file.type)||file.size>15*1024*1024){status.textContent="Choose a PNG, JPEG, or WebP image smaller than 15 MB.";input.value="";return;}const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{image=img;const scale=Math.max(320/img.width,256/img.height),w=img.width*scale,h=img.height*scale;ctx.fillStyle="#000";ctx.fillRect(0,0,320,256);ctx.drawImage(img,(320-w)/2,(256-h)/2,w,h);URL.revokeObjectURL(url);name.textContent=file.name;button.disabled=false;status.textContent="Ready to encode locally.";link.hidden=true;};img.onerror=()=>{URL.revokeObjectURL(url);status.textContent="Could not read this image.";};img.src=url;});
-function makeWav(samples,rate){const b=new ArrayBuffer(44+samples.length*2),v=new DataView(b),s=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};s(0,"RIFF");v.setUint32(4,36+samples.length*2,true);s(8,"WAVE");s(12,"fmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);s(36,"data");v.setUint32(40,samples.length*2,true);for(let i=0;i<samples.length;i++)v.setInt16(44+i*2,Math.max(-32768,Math.min(32767,samples[i]*32767)),true);return new Blob([b],{type:"audio/wav"});}
-button.addEventListener("click",async()=>{if(!image)return;button.disabled=true;link.hidden=true;status.textContent="Encoding…";await new Promise(r=>setTimeout(r,20));try{const rate=11025,vis=Number(mode.value),scan=vis===40?.073216:.146432,pixel=scan/320,samples=[];let phase=0;const tone=(freq,seconds)=>{const n=Math.max(1,Math.round(seconds*rate));for(let i=0;i<n;i++){const env=Math.min(1,i/24,(n-i)/24);samples.push(Math.sin(phase)*.72*Math.max(0,env));phase+=2*Math.PI*freq/rate;if(phase>Math.PI*2)phase-=Math.PI*2;}};tone(1900,.3);tone(1200,.01);tone(1900,.3);tone(1200,.03);let parity=0;for(let bit=0;bit<7;bit++){const one=(vis>>bit)&1;parity^=one;tone(one?1100:1300,.03);}tone(parity?1100:1300,.03);tone(1200,.03);const data=ctx.getImageData(0,0,320,256).data;const scanChannel=(y,c)=>{for(let x=0;x<320;x++)tone(1500+data[(y*320+x)*4+c]/255*800,pixel);};for(let y=0;y<256;y++){tone(1200,.004862);tone(1500,.000572);scanChannel(y,1);tone(1500,.000572);scanChannel(y,2);tone(1500,.000572);scanChannel(y,0);tone(1500,.000572);}const blob=makeWav(samples,rate);if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(blob);link.href=objectUrl;link.download="erikraft-"+(vis===40?"martin2":"martin1")+".wav";link.hidden=false;status.textContent="Finished · "+(blob.size/1048576).toFixed(2)+" MB WAV · "+Math.round(samples.length/rate)+" seconds";}catch(e){console.error(e);status.textContent="Encoding failed. Try another image.";}finally{button.disabled=!image;}});
-window.addEventListener("beforeunload",()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);});
+const input = document.getElementById("imageInput");
+const name = document.getElementById("imageFileName");
+const mode = document.getElementById("encodeMode");
+const button = document.getElementById("encodeButton");
+const link = document.getElementById("downloadAudio");
+const status = document.getElementById("encodeStatus");
+const canvas = document.getElementById("encodePreview");
+const ctx = canvas.getContext("2d");
+
+const MAX_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
+const MAX_IMAGE_PIXELS = 16_000_000;
+const MAX_IMAGE_DIMENSION = 8192;
+
+let image = null;
+let objectUrl = null;
+
+input.addEventListener("change", () => {
+  const file = input.files?.[0];
+  if (!file) return;
+
+  if (
+    !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+    file.size > MAX_IMAGE_FILE_SIZE
+  ) {
+    status.textContent =
+      "Choose a PNG, JPEG, or WebP image smaller than 15 MB.";
+    input.value = "";
+    return;
+  }
+
+  button.disabled = true;
+  link.hidden = true;
+  status.textContent = "Loading image…";
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    const pixelCount = width * height;
+
+    if (
+      !width ||
+      !height ||
+      width > MAX_IMAGE_DIMENSION ||
+      height > MAX_IMAGE_DIMENSION ||
+      pixelCount > MAX_IMAGE_PIXELS
+    ) {
+      URL.revokeObjectURL(url);
+      image = null;
+      input.value = "";
+      button.disabled = true;
+      status.textContent =
+        "Image dimensions are too large. Maximum: 8192 × 8192 pixels and 16 megapixels.";
+      return;
+    }
+
+    image = img;
+    const scale = Math.max(320 / width, 256 / height);
+    const w = width * scale;
+    const h = height * scale;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, 320, 256);
+    ctx.drawImage(img, (320 - w) / 2, (256 - h) / 2, w, h);
+
+    URL.revokeObjectURL(url);
+    name.textContent = file.name;
+    button.disabled = false;
+    status.textContent = "Ready to encode locally.";
+    link.hidden = true;
+  };
+
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    image = null;
+    input.value = "";
+    button.disabled = true;
+    status.textContent = "Could not read this image.";
+  };
+
+  img.src = url;
+});
+
+function makeWav(samples, rate) {
+  const b = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(b);
+  const s = (o, t) => {
+    for (let i = 0; i < t.length; i++) {
+      v.setUint8(o + i, t.charCodeAt(i));
+    }
+  };
+
+  s(0, "RIFF");
+  v.setUint32(4, 36 + samples.length * 2, true);
+  s(8, "WAVE");
+  s(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  s(36, "data");
+  v.setUint32(40, samples.length * 2, true);
+
+  for (let i = 0; i < samples.length; i++) {
+    v.setInt16(
+      44 + i * 2,
+      Math.max(-32768, Math.min(32767, samples[i] * 32767)),
+      true
+    );
+  }
+
+  return new Blob([b], { type: "audio/wav" });
+}
+
+button.addEventListener("click", async () => {
+  if (!image) return;
+
+  button.disabled = true;
+  link.hidden = true;
+  status.textContent = "Encoding…";
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  try {
+    const rate = 11025;
+    const vis = Number(mode.value);
+    const scan = vis === 40 ? 0.073216 : 0.146432;
+    const pixel = scan / 320;
+    const samples = [];
+    let phase = 0;
+
+    const tone = (freq, seconds) => {
+      const n = Math.max(1, Math.round(seconds * rate));
+      for (let i = 0; i < n; i++) {
+        const env = Math.min(1, i / 24, (n - i) / 24);
+        samples.push(Math.sin(phase) * 0.72 * Math.max(0, env));
+        phase += (2 * Math.PI * freq) / rate;
+        if (phase > Math.PI * 2) phase -= Math.PI * 2;
+      }
+    };
+
+    tone(1900, 0.3);
+    tone(1200, 0.01);
+    tone(1900, 0.3);
+    tone(1200, 0.03);
+
+    let parity = 0;
+    for (let bit = 0; bit < 7; bit++) {
+      const one = (vis >> bit) & 1;
+      parity ^= one;
+      tone(one ? 1100 : 1300, 0.03);
+    }
+
+    tone(parity ? 1100 : 1300, 0.03);
+    tone(1200, 0.03);
+
+    const data = ctx.getImageData(0, 0, 320, 256).data;
+    const scanChannel = (y, channel) => {
+      for (let x = 0; x < 320; x++) {
+        tone(
+          1500 + (data[(y * 320 + x) * 4 + channel] / 255) * 800,
+          pixel
+        );
+      }
+    };
+
+    for (let y = 0; y < 256; y++) {
+      tone(1200, 0.004862);
+      tone(1500, 0.000572);
+      scanChannel(y, 1);
+      tone(1500, 0.000572);
+      scanChannel(y, 2);
+      tone(1500, 0.000572);
+      scanChannel(y, 0);
+      tone(1500, 0.000572);
+    }
+
+    const blob = makeWav(samples, rate);
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download =
+      "erikraft-" + (vis === 40 ? "martin2" : "martin1") + ".wav";
+    link.hidden = false;
+    status.textContent =
+      "Finished · " +
+      (blob.size / 1048576).toFixed(2) +
+      " MB WAV · " +
+      Math.round(samples.length / rate) +
+      " seconds";
+  } catch (error) {
+    console.error(error);
+    status.textContent = "Encoding failed. Try another image.";
+  } finally {
+    button.disabled = !image;
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+});
