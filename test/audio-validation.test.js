@@ -36,3 +36,16 @@ test("rejects audio exceeding the maximum duration", () => {
     /10-minute/
   );
 });
+
+test("rejects sample arrays above the hard memory cap", () => {
+  class OversizedFloat32Array extends Float32Array {
+    get length() {
+      return 30_000_001;
+    }
+  }
+  const samples = new OversizedFloat32Array(1);
+  assert.throws(
+    () => validateDecodeRequest({ samples, sampleRate: 192000, fftSize: 512 }),
+    /30-million-sample/
+  );
+});
