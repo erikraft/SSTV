@@ -872,11 +872,6 @@ async function handleAudioFile(file) {
     decodeAudioPlayback.src = currentAudioUrl;
     decodeAudioPlayback.hidden = false;
     decodeAudioPlayback.currentTime = 0;
-    void decodeAudioPlayback.play().catch(() => {
-      if (microphoneStatus) {
-        microphoneStatus.textContent = "Audio loaded. Press Play in the audio controls to listen.";
-      }
-    });
     currentSamples = samples;
     currentSampleRate = decoded.sampleRate;
 

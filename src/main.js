@@ -7,7 +7,7 @@ import "./decoder.js";
 import "./encoder.js";
 import "./encoder.css";
 import "./microphone.css";
-import "./audio-player.css";
+import "./audio-player.js";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
