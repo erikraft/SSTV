@@ -5,6 +5,7 @@ import {
   MAX_IMAGE_PIXELS,
   MAX_IMAGE_DIMENSION,
 } from "./image-validation.js";
+import { getSstvWavDownloadName } from "./download-name.js";
 
 const input = document.getElementById("imageInput");
 const name = document.getElementById("imageFileName");
@@ -240,8 +241,7 @@ button.addEventListener("click", async () => {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(blob);
     link.href = objectUrl;
-    link.download =
-      "erikraft-" + (vis === 40 ? "martin2" : "martin1") + ".wav";
+    link.download = getSstvWavDownloadName(vis);
     link.hidden = false;
 
     audioPlayback.src = objectUrl;
