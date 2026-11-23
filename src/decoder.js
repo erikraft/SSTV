@@ -10,6 +10,7 @@ import {
   clearAll,
 } from "./decode-history-store.js";
 import { showConfirmDialog } from "./confirm-dialog.js";
+import { getSstvDecodedImageDownloadName } from "./download-name.js";
 
 const audioInput = document.getElementById("audioInput");
 const microphoneStartButton = document.getElementById("microphoneStartButton");
@@ -110,9 +111,8 @@ const decodedImages = [];
 let decodeHistoryReady = false;
 
 function getDecodedImageDownloadName(sourceFileName) {
-  const name = sourceFileName.split(/[/\\]/).pop() || "audio";
-  const baseName = name.replace(/\.[^/.]+$/, "") || name;
-  return `${baseName} - SSTV decoded.png`;
+  void sourceFileName;
+  return getSstvDecodedImageDownloadName();
 }
 const decoderWorker = new DecoderWorker();
 
@@ -126,10 +126,17 @@ function clampDecodeProgress(percent) {
   return Math.max(0, Math.min(100, percent));
 }
 
+function stopDecodeAudioPlayback() {
+  if (!decodeAudioPlayback) return;
+  decodeAudioPlayback.pause();
+  decodeAudioPlayback.currentTime = 0;
+}
+
 function applyDecodeProgressDisplay(percent) {
   if (!decodeProgress || !decodeProgressFill) return;
 
   const clamped = clampDecodeProgress(percent);
+  if (clamped >= 100) stopDecodeAudioPlayback();
   decodeProgressFill.style.setProperty(
     "--decode-progress",
     String(clamped / 100)
@@ -864,6 +871,12 @@ async function handleAudioFile(file) {
     currentAudioUrl = nextAudioUrl;
     decodeAudioPlayback.src = currentAudioUrl;
     decodeAudioPlayback.hidden = false;
+    decodeAudioPlayback.currentTime = 0;
+    void decodeAudioPlayback.play().catch(() => {
+      if (microphoneStatus) {
+        microphoneStatus.textContent = "Audio loaded. Press Play in the audio controls to listen.";
+      }
+    });
     currentSamples = samples;
     currentSampleRate = decoded.sampleRate;
 
@@ -1105,6 +1118,7 @@ decoderWorker.onmessage = (event) => {
   }
 
   if (data.type === "error") {
+    stopDecodeAudioPlayback();
     const message = typeof data.error?.message === "string"
       ? data.error.message.slice(0, 500)
       : "SSTV decoding failed.";
@@ -1131,6 +1145,7 @@ decoderWorker.onmessage = (event) => {
     width * height > 16_000_000 ||
     imageData.byteLength !== width * height * 4
   ) {
+    stopDecodeAudioPlayback();
     hideDecodeProgress({
       onComplete: () => {
         showErrorMessage("The decoder returned invalid image data.");
@@ -1144,6 +1159,7 @@ decoderWorker.onmessage = (event) => {
 
   hideDecodeProgress({
     onComplete: async () => {
+      stopDecodeAudioPlayback();
       try {
         const blob = await imageDataToPngBlob(imgData);
         const objectUrl = URL.createObjectURL(blob);
@@ -1199,6 +1215,7 @@ decoderWorker.onmessage = (event) => {
 };
 decoderWorker.onerror = (event) => {
   console.error("Worker error:", event.message, event);
+  stopDecodeAudioPlayback();
   hideDecodeProgress();
   showErrorMessage("The decoder worker stopped unexpectedly. Try loading the audio again.");
   decodeButton.disabled = !decodeHistoryReady;
