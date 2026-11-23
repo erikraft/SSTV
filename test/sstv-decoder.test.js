@@ -79,3 +79,10 @@ test("refines automatic header alignment at 44.1 kHz", () => {
   assert.ok(Math.abs(headerEnd / sampleRate - (0.123 + 0.64)) < 0.001);
   assert.equal(decoder._decodeVIS(headerEnd).NAME, "Martin 1");
 });
+
+test("keeps the correct header origin when the recording starts with the SSTV leader", () => {
+  const sampleRate = 11025;
+  const decoder = new SSTVDecoder(makeSstvHeader(44, sampleRate, 0), sampleRate, 512);
+  const headerEnd = decoder._findHeader();
+  assert.ok(Math.abs(headerEnd / sampleRate - 0.64) < 0.001);
+});

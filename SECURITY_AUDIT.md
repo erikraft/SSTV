@@ -183,7 +183,7 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - **Confiança:** CONFIRMADA quanto às fragilidades algorítmicas no código; a causa exata da gravação que o usuário decodificou permanece NÃO VERIFICÁVEL sem o arquivo original.
 - **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições; e a função de interpolação de pico em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
 - **Impacto plausível:** interferência forte fora da banda SSTV, bordas de tom ou estimativas de frequência imprecisas podem atrapalhar a identificação do cabeçalho/VIS e a leitura de tons de pixel, gerando falha ou imagem degradada.
-- **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`.
+- **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; refina o início real do cabeçalho com pontuação Goertzel dos quatro tons do preâmbulo (sem deslocar a imagem alguns milissegundos); usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`.
 - **Limitação:** não foi fornecido o áudio que reproduziu o problema. Testes sintéticos de cabeçalho/VIS não substituem a validação com a gravação original.
 
 ### Revisão do PR upstream Equinoxis/sstv-decoder#1
@@ -221,4 +221,4 @@ O PR contém um único commit (`afd07ebf96da8223a06773a55e2cfb3f1656a3da`). Ele 
 - Não foram executados testes contra produção, auditoria de painel Vercel, scanner histórico completo de segredos ou análise de infraestrutura externa.
 - Nenhuma CVE ou vulnerabilidade de dependência foi inventada.
 
-**Conclusão complementar:** a superfície de ataque continua limitada a uma SPA estática e ao processamento local. A correção mantém a detecção automática sem o seletor manual, remove o efeito Matrix e endurece a estimativa de frequência. A auditoria de supply chain e a validação com o áudio real permanecem pendentes.
+**Conclusão complementar:** a superfície de ataque continua limitada a uma SPA estática e ao processamento local. A correção mantém a detecção automática sem o seletor manual, alinha o início do sinal antes de decodificar pixels, remove o efeito Matrix e endurece a estimativa de frequência. A auditoria de supply chain e a validação com o áudio real permanecem pendentes.
