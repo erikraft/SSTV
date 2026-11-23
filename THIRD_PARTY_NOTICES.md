@@ -1,6 +1,6 @@
 ## Equinoxis SSTV Decoder
 
-This project adapts portions of https://github.com/Equinoxis/sstv-decoder and the manual mode selection change from https://github.com/Equinoxis/sstv-decoder/pull/1/commits. The upstream README declares the project MIT licensed.
+This project adapts portions of the MIT-licensed decoder at https://github.com/Equinoxis/sstv-decoder. No code from its manual-mode-selection pull request is included.
 
 Copyright (c) Mathieu Renaud
 
