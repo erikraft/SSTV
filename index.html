@@ -1,62 +1,75 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <title>
-      ErikrafT SSTV Decoder & Encoder - Decode Slow Scan Television Audio to Images
-    </title>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ErikrafT SSTV Decoder &amp; Encoder | Free Online Slow Scan Television Tool</title>
+    <meta name="description" content="Decode SSTV audio into images and encode images into SSTV audio directly in your browser. Free online SSTV tool with Robot, Martin and Scottie modes. Files stay on your device." />
     <meta name="author" content="ErikrafT" />
-    <meta
-      name="description"
-      content="Decode SSTV (Slow Scan Television) audio signals into images online. Supports Robot36, Scottie1, Martin1, and other ham radio modes directly in your browser."
-    />
-    <meta
-      name="keywords"
-      content="SSTV Decoder, Slow Scan Television, Robot36, Scottie1, Martin1, ham radio, audio to image, amateur radio SSTV, browser-based SSTV decoder"
-    />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#4f46e5" />
-    <link rel="canonical" href="https://erikraft.com/" />
+    <meta name="color-scheme" content="light dark" />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="preload" as="image" href="/favicon.ico" />
+    <link rel="preload" as="image" href="/favicon2.ico" />
+    <script type="module" src="/src/favicon-animation.js"></script>
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="ErikrafT SSTV Decoder & Encoder" />
-    <meta
-      property="og:title"
-      content="ErikrafT SSTV Decoder & Encoder - Decode Slow Scan Television Audio to Images"
-    />
-    <meta
-      property="og:description"
-      content="Decode SSTV audio into images and encode images into SSTV audio locally in your browser."
-    />
-    <meta property="og:url" content="https://erikraft.com/" />
-    
+    <meta property="og:site_name" content="ErikrafT SSTV Decoder &amp; Encoder" />
+    <meta property="og:title" content="ErikrafT SSTV Decoder &amp; Encoder | Free Online SSTV Tool" />
+    <meta property="og:description" content="Decode SSTV audio into images and encode images into SSTV audio locally in your browser. Supports Robot, Martin and Scottie modes." />
+    <meta property="og:locale" content="en_US" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="SSTV Decoder - Decode Slow Scan Television Audio to Images"
-    />
-    <meta
-      name="twitter:description"
-      content="Decode SSTV (Robot36, Scottie, Martin) audio signals directly in your browser with this fast, accurate SSTV decoder."
-    />
-    
-    
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="ErikrafT SSTV Decoder &amp; Encoder" />
+    <meta name="twitter:description" content="Free browser-based SSTV decoder and encoder. Convert audio to images and images to audio without uploading your files." />
 
-    
-
-    
-    
-    
-    
-    
-    <meta name="msapplication-TileColor" content="#4f46e5" />
-
-    
-
-    
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Person",
+            "@id": "https://www.erikraft.com/#person",
+            "name": "ErikrafT",
+            "url": "https://www.erikraft.com/",
+            "sameAs": [
+              "https://github.com/erikraft",
+              "https://www.youtube.com/@ErikrafT"
+            ]
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://github.com/erikraft/SSTV#webapplication",
+            "name": "ErikrafT SSTV Decoder & Encoder",
+            "description": "A free browser-based Slow Scan Television application for decoding SSTV audio into images and encoding images into SSTV audio locally on the user's device.",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any operating system with a modern web browser",
+            "browserRequirements": "JavaScript and Web Audio API support",
+            "isAccessibleForFree": true,
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "featureList": [
+              "Decode SSTV audio recordings into images",
+              "Encode images into SSTV audio",
+              "Automatic VIS mode detection",
+              "Manual Robot, Martin and Scottie mode selection",
+              "Local browser-side processing without uploading user files"
+            ],
+            "creator": {
+              "@id": "https://www.erikraft.com/#person"
+            },
+            "codeRepository": "https://github.com/erikraft/SSTV"
+          }
+        ]
+      }
+    </script>
   </head>
 
   <body
