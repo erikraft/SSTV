@@ -6,3 +6,4 @@ import "./quality-ui.js";
 import "./decoder.js";
 import "./encoder.js";
 import "./encoder.css";
+import "./microphone.css";

@@ -1,21 +1,47 @@
 import SSTVDecoder from "../sstv/decoder.js";
+import { validateDecodeRequest } from "../audio-validation.js";
 
 self.onmessage = async (event) => {
-  const { samples, sampleRate, fftSize, forcedMode = null } = event.data;
+  let request;
 
-  const decoder = new SSTVDecoder(samples, sampleRate, fftSize, (percent) => {
-    self.postMessage({ progress: percent });
-  }, forcedMode);
+  try {
+    request = validateDecodeRequest(event.data);
+  } catch (error) {
+    self.postMessage({
+      type: "error",
+      error: { message: error instanceof Error ? error.message : "Invalid decoder request." },
+    });
+    return;
+  }
+
+  const { samples, sampleRate, fftSize, forcedMode } = request;
+  const decoder = new SSTVDecoder(
+    samples,
+    sampleRate,
+    fftSize,
+    (progress) => self.postMessage({ type: "progress", progress }),
+    forcedMode,
+    (width, height, mode) => {
+      self.postMessage({ type: "start", width, height, mode });
+    },
+    (line, pixels) => {
+      self.postMessage(
+        { type: "line", line, width: pixels.length / 4, pixels: pixels.buffer },
+        [pixels.buffer]
+      );
+    }
+  );
 
   try {
     const { buffer, width, height } = await decoder.decode();
-
+    self.postMessage(
+      { type: "complete", imageData: buffer.buffer, width, height },
+      [buffer.buffer]
+    );
+  } catch (error) {
     self.postMessage({
-      imageData: buffer.buffer,
-      width,
-      height,
+      type: "error",
+      error: { message: error instanceof Error ? error.message : "SSTV decoding failed." },
     });
-  } catch (err) {
-    self.postMessage({ error: err });
   }
 };

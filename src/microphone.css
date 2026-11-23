@@ -1,0 +1,6 @@
+
+.microphone-controls{display:flex;flex-direction:column;align-items:center;gap:.7rem;padding:1rem;border:1px solid var(--app-border);border-radius:12px;background:var(--app-surface,transparent)}
+.microphone-controls__actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.6rem}
+.microphone-controls__playback{display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:var(--app-muted)}
+.microphone-controls__audio{width:min(100%,560px)}
+.microphone-controls__audio[hidden]{display:none}

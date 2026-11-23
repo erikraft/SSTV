@@ -25,15 +25,6 @@ const errorMessage = document.getElementById("errorMessage");
 const CONTACT_URL = "https://mathieurenaud.fr/";
 const MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024;
 
-function escapeHtml(text) {
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function showErrorMessage(message) {
   errorMessage.innerHTML = `<span class="error-message__text">${escapeHtml(message)}</span><span class="error-message__contact">If you think this should work, feel free to <a href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">contact me</a>.</span>`;
   errorMessage.style.display = "block";

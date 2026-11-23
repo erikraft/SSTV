@@ -6,6 +6,8 @@ const link = document.getElementById("downloadAudio");
 const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
+const audioPlayback = document.getElementById("encodeAudioPlayback");
+const previewWrap = document.getElementById("encoderPreviewWrap");
 
 const MAX_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 16_000_000;
@@ -17,6 +19,15 @@ let objectUrl = null;
 input.addEventListener("change", () => {
   const file = input.files?.[0];
   if (!file) return;
+
+  audioPlayback.pause();
+  audioPlayback.hidden = true;
+  audioPlayback.removeAttribute("src");
+  previewWrap.classList.remove("is-transmitting");
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
+  }
 
   if (
     !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
@@ -122,7 +133,10 @@ button.addEventListener("click", async () => {
 
   button.disabled = true;
   link.hidden = true;
-  status.textContent = "Encoding…";
+  audioPlayback.pause();
+  audioPlayback.hidden = true;
+  previewWrap.classList.remove("is-transmitting");
+  status.textContent = "Generating SSTV audio…";
   await new Promise((resolve) => setTimeout(resolve, 20));
 
   try {
@@ -186,12 +200,27 @@ button.addEventListener("click", async () => {
     link.download =
       "erikraft-" + (vis === 40 ? "martin2" : "martin1") + ".wav";
     link.hidden = false;
+
+    audioPlayback.src = objectUrl;
+    audioPlayback.hidden = false;
+    audioPlayback.onended = () => previewWrap.classList.remove("is-transmitting");
+    audioPlayback.onpause = () => previewWrap.classList.remove("is-transmitting");
+    previewWrap.classList.add("is-transmitting");
+
+    const playback = audioPlayback.play();
+    if (playback && typeof playback.catch === "function") {
+      playback.catch(() => {
+        previewWrap.classList.remove("is-transmitting");
+        status.textContent += " · Press Play to listen to the generated transmission.";
+      });
+    }
+
     status.textContent =
-      "Finished · " +
+      "WAV ready · " +
       (blob.size / 1048576).toFixed(2) +
-      " MB WAV · " +
+      " MB · " +
       Math.round(samples.length / rate) +
-      " seconds";
+      " seconds · playing SSTV transmission";
   } catch (error) {
     console.error(error);
     status.textContent = "Encoding failed. Try another image.";
@@ -201,5 +230,6 @@ button.addEventListener("click", async () => {
 });
 
 window.addEventListener("beforeunload", () => {
+  audioPlayback.pause();
   if (objectUrl) URL.revokeObjectURL(objectUrl);
 });
