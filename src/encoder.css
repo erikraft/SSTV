@@ -7,3 +7,8 @@
 .encoder-preview-wrap .encoder-preview{width:100%;max-height:480px;margin:0;border:0;border-radius:0}
 .encoder-audio-player{display:block;width:min(100%,640px);margin:.85rem auto 0}
 .encoder-audio-player[hidden]{display:none}
+
+.image-position-controls{display:grid;grid-template-columns:1fr;gap:.45rem;padding:.75rem;border:1px solid var(--app-border);border-radius:10px;background:var(--app-surface,transparent)}
+.image-position-controls[hidden]{display:none}
+.image-position-controls label{font-size:.8rem;font-weight:600;color:var(--app-muted)}
+.image-position-controls input[type=range]{width:100%;accent-color:var(--app-accent)}
