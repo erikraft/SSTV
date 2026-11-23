@@ -17,13 +17,15 @@ import {
 } from "../spec.js";
 
 class SSTVDecoder {
-  constructor(audioBuffer, sampleRate, fftSize = null, onProgress, forcedMode = null) {
+  constructor(audioBuffer, sampleRate, fftSize = null, onProgress, forcedMode = null, onStart = null, onLine = null) {
     this.samples = audioBuffer;
     this.sampleRate = sampleRate;
     this.fftSize = fftSize;
     this.mode = null;
     this.onProgress = onProgress;
     this.forcedMode = forcedMode;
+    this.onStart = onStart;
+    this.onLine = onLine;
   }
 
   async decode() {
@@ -32,6 +34,7 @@ class SSTVDecoder {
 
     this.mode = this.forcedMode === null || this.forcedMode === undefined ? this._decodeVIS(headerEnd) : VIS_MAP[this.forcedMode];
     if (!this.mode) throw new Error(`Unsupported forced SSTV mode: ${this.forcedMode}`);
+    this.onStart?.(this.mode.LINE_WIDTH, this.mode.LINE_COUNT, this.mode.NAME);
     if (this.onProgress) this.onProgress(10);
 
     const visEnd = headerEnd + Math.round(VIS_BIT_SIZE * 9 * this.sampleRate);
@@ -205,9 +208,65 @@ class SSTVDecoder {
           imageData[line][chan][px] = freqToLum(freq);
         }
       }
+
+      if (this.onLine) {
+        const lines =
+          channels === 2 && mode.HAS_ALT_SCAN
+            ? line % 2 === 1
+              ? [line - 1, line]
+              : []
+            : [line];
+        for (const y of lines) {
+          this.onLine(y, this._generateImageRow(imageData, y));
+        }
+      }
     }
 
     return imageData;
+  }
+
+  _generateImageRow(imageData, y) {
+    const mode = this.mode;
+    const width = mode.LINE_WIDTH;
+    const channels = mode.CHAN_COUNT;
+    const oddLine = y % 2;
+    const row = new Uint8ClampedArray(width * 4);
+
+    for (let x = 0; x < width; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+
+      if (channels === 2 && mode.HAS_ALT_SCAN && mode.COLOR === COL_FMT.YUV) {
+        const yVal = imageData[y][0][x];
+        const cbVal = imageData[y - (oddLine - 1)]?.[1]?.[x] ?? 128;
+        const crVal = imageData[y - oddLine]?.[1]?.[x] ?? 128;
+        [r, g, b] = yuvToRgb(yVal, cbVal, crVal);
+      } else if (channels === 3) {
+        if (mode.COLOR === COL_FMT.GBR) {
+          r = imageData[y][2][x];
+          g = imageData[y][0][x];
+          b = imageData[y][1][x];
+        } else if (mode.COLOR === COL_FMT.YUV) {
+          const yVal = imageData[y][0][x];
+          const cbVal = imageData[y][1][x];
+          const crVal = imageData[y][2][x];
+          [r, g, b] = yuvToRgb(yVal, cbVal, crVal);
+        } else if (mode.COLOR === COL_FMT.RGB) {
+          r = imageData[y][0][x];
+          g = imageData[y][1][x];
+          b = imageData[y][2][x];
+        }
+      }
+
+      const index = x * 4;
+      row[index] = r;
+      row[index + 1] = g;
+      row[index + 2] = b;
+      row[index + 3] = 255;
+    }
+
+    return row;
   }
 
   _generateImageBuffer(imageData) {

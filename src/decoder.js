@@ -12,6 +12,12 @@ import {
 import { showConfirmDialog } from "./confirm-dialog.js";
 
 const audioInput = document.getElementById("audioInput");
+const microphoneStartButton = document.getElementById("microphoneStartButton");
+const microphoneStopButton = document.getElementById("microphoneStopButton");
+const feedbackSuppressionButton = document.getElementById("feedbackSuppressionButton");
+const microphoneStatus = document.getElementById("microphoneStatus");
+const decodeAudioPlayback = document.getElementById("decodeAudioPlayback");
+const playAudioWhileDecoding = document.getElementById("playAudioWhileDecoding");
 const dropZone = document.getElementById("dropZone");
 const audioFileNameDisplay = document.getElementById("audioFileNameDisplay");
 const canvas = document.getElementById("sstvCanvas");
@@ -22,20 +28,41 @@ const decodeButton = document.getElementById("decodeButton");
 const downloadImageButton = document.getElementById("downloadImageButton");
 const feedbackCard = document.getElementById("feedbackCard");
 const errorMessage = document.getElementById("errorMessage");
-const CONTACT_URL = "https://mathieurenaud.fr/";
+const CONTACT_URL = "https://erikraft.com/";
 const MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_AUDIO_DURATION_SECONDS = 600;
+const MAX_AUDIO_SAMPLE_COUNT = 30_000_000;
+const ALLOWED_AUDIO_EXTENSIONS = /\.(wav|mp3|ogg|opus|webm|m4a|aac|flac|aif|aiff)$/i;
 
-function escapeHtml(text) {
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+let currentAudioUrl = null;
+let audioLoadGeneration = 0;
+let microphoneStream = null;
+let microphoneRecorder = null;
+let microphoneChunks = [];
+let microphoneBytes = 0;
+let microphoneRecordingTooLarge = false;
+let microphoneRecordingTimer = null;
+let feedbackSuppressionEnabled = true;
 
 function showErrorMessage(message) {
-  errorMessage.innerHTML = `<span class="error-message__text">${escapeHtml(message)}</span><span class="error-message__contact">If you think this should work, feel free to <a href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">contact me</a>.</span>`;
+  const messageText = document.createElement("span");
+  messageText.className = "error-message__text";
+  messageText.textContent = String(message);
+
+  const contactText = document.createElement("span");
+  contactText.className = "error-message__contact";
+  const contactLink = document.createElement("a");
+  contactLink.href = CONTACT_URL;
+  contactLink.target = "_blank";
+  contactLink.rel = "noopener noreferrer";
+  contactLink.textContent = "contact me";
+  contactText.append(
+    "If you think this should work, feel free to ",
+    contactLink,
+    "."
+  );
+
+  errorMessage.replaceChildren(messageText, contactText);
   errorMessage.style.display = "block";
 }
 
@@ -732,8 +759,8 @@ imageScrollHintBtn?.addEventListener("click", () => {
 });
 
 audioInput.addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (file) handleAudioFile(file);
+  const file = event.target.files?.[0];
+  if (file) void handleAudioFile(file);
 });
 
 dropZone.addEventListener("click", () => audioInput.click());
@@ -750,46 +777,253 @@ dropZone.addEventListener("dragleave", () =>
 dropZone.addEventListener("drop", (event) => {
   event.preventDefault();
   dropZone.classList.remove("active");
-  const file = event.dataTransfer.files[0];
-  if (file) handleAudioFile(file);
+  const file = event.dataTransfer.files?.[0];
+  if (file) void handleAudioFile(file);
 });
 
-function handleAudioFile(file) {
+async function handleAudioFile(file) {
+  const loadGeneration = ++audioLoadGeneration;
+  currentSamples = null;
+  currentSampleRate = null;
+  decodeButton.disabled = true;
+  decodeAudioPlayback.pause();
+  decodeAudioPlayback.removeAttribute("src");
+  decodeAudioPlayback.hidden = true;
+  if (currentAudioUrl) {
+    URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = null;
+  }
+
+  if (!(file instanceof Blob) || file.size <= 0) {
+    showErrorMessage("Choose a valid audio file.");
+    return false;
+  }
+
   if (file.size > MAX_AUDIO_FILE_SIZE) {
     showErrorMessage("Audio file is too large. The maximum supported size is 50 MB.");
-    return;
+    return false;
+  }
+
+  const fileName = typeof file.name === "string" ? file.name : "audio-recording";
+  if (file.type && !file.type.startsWith("audio/") && !ALLOWED_AUDIO_EXTENSIONS.test(fileName)) {
+    showErrorMessage("Choose a supported audio file.");
+    return false;
+  }
+  if (!file.type && !ALLOWED_AUDIO_EXTENSIONS.test(fileName)) {
+    showErrorMessage("Choose a supported audio file.");
+    return false;
   }
 
   hideErrorMessage();
-  currentSourceFileName = file.name;
+  decodeButton.disabled = true;
+  currentSamples = null;
+  currentSampleRate = null;
+  currentSourceFileName = fileName;
   dropZone.classList.add("has-file");
   audioFileNameDisplay.replaceChildren(document.createTextNode("Selected file: "));
   const selectedFileName = document.createElement("span");
   selectedFileName.className = "font-medium text-app-accent";
-  selectedFileName.textContent = file.name;
+  selectedFileName.textContent = fileName;
   audioFileNameDisplay.append(selectedFileName);
-  const reader = new FileReader();
 
-  reader.onload = async () => {
-    const arrayBuffer = reader.result;
-    const audioCtx = new AudioContext();
+  const nextAudioUrl = URL.createObjectURL(file);
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    URL.revokeObjectURL(nextAudioUrl);
+    showErrorMessage("This browser does not support Web Audio decoding.");
+    return false;
+  }
 
-    try {
-      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-      currentSamples = decoded.getChannelData(0).slice();
-      currentSampleRate = decoded.sampleRate;
-
-      if (decodeHistoryReady) {
-        decodeButton.disabled = false;
-      }
-    } catch (err) {
-      console.error("Error decoding audio file:", err);
-      alert("Failed to decode the audio file.");
+  let audioContext;
+  try {
+    audioContext = new AudioContextClass();
+    const decoded = await audioContext.decodeAudioData(await file.arrayBuffer());
+    if (loadGeneration !== audioLoadGeneration) {
+      URL.revokeObjectURL(nextAudioUrl);
+      return false;
     }
-  };
+    if (
+      !Number.isFinite(decoded.duration) ||
+      decoded.duration <= 0 ||
+      decoded.duration > MAX_AUDIO_DURATION_SECONDS
+    ) {
+      throw new Error("Audio exceeds the 10-minute decoding limit.");
+    }
 
-  reader.readAsArrayBuffer(file);
+    const samples = decoded.getChannelData(0).slice();
+    if (
+      !Number.isInteger(decoded.sampleRate) ||
+      decoded.sampleRate < 8000 ||
+      decoded.sampleRate > 192000 ||
+      samples.length > decoded.sampleRate * MAX_AUDIO_DURATION_SECONDS ||
+      samples.length > MAX_AUDIO_SAMPLE_COUNT
+    ) {
+      throw new Error("Audio exceeds the supported sample limits.");
+    }
+
+    if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = nextAudioUrl;
+    decodeAudioPlayback.src = currentAudioUrl;
+    decodeAudioPlayback.hidden = false;
+    currentSamples = samples;
+    currentSampleRate = decoded.sampleRate;
+
+    if (decodeHistoryReady) decodeButton.disabled = false;
+    if (microphoneStatus) microphoneStatus.textContent = "Audio ready. Press Decode SSTV to start.";
+    return true;
+  } catch (error) {
+    URL.revokeObjectURL(nextAudioUrl);
+    if (loadGeneration !== audioLoadGeneration) return false;
+    console.error("Error decoding audio file:", error);
+    showErrorMessage(error instanceof Error ? error.message : "Failed to decode the audio file.");
+    return false;
+  } finally {
+    await audioContext?.close().catch(() => {});
+  }
 }
+
+function updateMicrophoneControls(isRecording) {
+  if (microphoneStartButton) microphoneStartButton.disabled = isRecording;
+  if (microphoneStopButton) microphoneStopButton.disabled = !isRecording;
+}
+
+function stopMicrophoneTracks() {
+  if (microphoneRecordingTimer !== null) {
+    clearTimeout(microphoneRecordingTimer);
+    microphoneRecordingTimer = null;
+  }
+  microphoneStream?.getTracks().forEach((track) => track.stop());
+  microphoneStream = null;
+}
+
+async function startMicrophoneCapture() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    showErrorMessage("Microphone recording is not supported by this browser. Use HTTPS or localhost and a modern browser.");
+    return;
+  }
+
+  try {
+    microphoneStartButton.disabled = true;
+    if (microphoneStatus) microphoneStatus.textContent = "Requesting microphone permission…";
+
+    microphoneStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: feedbackSuppressionEnabled,
+        noiseSuppression: feedbackSuppressionEnabled,
+        autoGainControl: feedbackSuppressionEnabled,
+        channelCount: 1,
+      },
+    });
+
+    const mimeCandidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/mp4",
+    ];
+    const mimeType =
+      typeof MediaRecorder.isTypeSupported === "function"
+        ? mimeCandidates.find((type) => MediaRecorder.isTypeSupported(type))
+        : null;
+    microphoneRecorder = new MediaRecorder(
+      microphoneStream,
+      mimeType ? { mimeType } : undefined
+    );
+    microphoneChunks = [];
+    microphoneBytes = 0;
+    microphoneRecordingTooLarge = false;
+
+    microphoneRecorder.addEventListener("dataavailable", (event) => {
+      if (!event.data || event.data.size <= 0) return;
+      microphoneBytes += event.data.size;
+      if (microphoneBytes > MAX_AUDIO_FILE_SIZE) {
+        microphoneRecordingTooLarge = true;
+        if (microphoneRecorder?.state === "recording") microphoneRecorder.stop();
+        return;
+      }
+      microphoneChunks.push(event.data);
+    });
+
+    microphoneRecorder.addEventListener("error", (event) => {
+      showErrorMessage(event.error?.message || "Microphone recording failed.");
+      stopMicrophoneTracks();
+      updateMicrophoneControls(false);
+    });
+
+    microphoneRecorder.addEventListener("stop", async () => {
+      stopMicrophoneTracks();
+      updateMicrophoneControls(false);
+
+      if (microphoneRecordingTooLarge) {
+        showErrorMessage("Microphone recording exceeded the 50 MB limit.");
+        if (microphoneStatus) microphoneStatus.textContent = "Recording stopped: size limit reached.";
+        return;
+      }
+
+      const mime = microphoneRecorder?.mimeType || microphoneChunks[0]?.type || "audio/webm";
+      const recording = new Blob(microphoneChunks, { type: mime });
+      microphoneChunks = [];
+      if (!recording.size) {
+        showErrorMessage("No microphone audio was captured.");
+        return;
+      }
+
+      const extension = mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "m4a" : "webm";
+      const file = new File([recording], `microphone-recording.${extension}`, { type: mime });
+      const loaded = await handleAudioFile(file);
+      if (loaded) decodeButton.click();
+    });
+
+    microphoneRecorder.start(250);
+    updateMicrophoneControls(true);
+    if (microphoneStatus) microphoneStatus.textContent = "Recording from microphone… Press Stop & decode when finished.";
+    microphoneRecordingTimer = window.setTimeout(() => {
+      if (microphoneRecorder?.state === "recording") microphoneRecorder.stop();
+    }, MAX_AUDIO_DURATION_SECONDS * 1000);
+  } catch (error) {
+    stopMicrophoneTracks();
+    updateMicrophoneControls(false);
+    showErrorMessage(error instanceof Error ? error.message : "Could not access the microphone.");
+    if (microphoneStatus) microphoneStatus.textContent = "Microphone unavailable.";
+  }
+}
+
+microphoneStartButton?.addEventListener("click", () => {
+  void startMicrophoneCapture();
+});
+
+microphoneStopButton?.addEventListener("click", () => {
+  if (microphoneRecorder?.state === "recording") {
+    microphoneRecorder.stop();
+    if (microphoneStatus) microphoneStatus.textContent = "Finishing recording…";
+  }
+});
+
+feedbackSuppressionButton?.addEventListener("click", async () => {
+  feedbackSuppressionEnabled = !feedbackSuppressionEnabled;
+  feedbackSuppressionButton.setAttribute("aria-pressed", String(feedbackSuppressionEnabled));
+  feedbackSuppressionButton.textContent = feedbackSuppressionEnabled
+    ? "Feedback suppression: ON"
+    : "Feedback suppression: OFF";
+
+  const track = microphoneStream?.getAudioTracks()[0];
+  if (track) {
+    try {
+      await track.applyConstraints({
+        echoCancellation: feedbackSuppressionEnabled,
+        noiseSuppression: feedbackSuppressionEnabled,
+        autoGainControl: feedbackSuppressionEnabled,
+      });
+    } catch {
+      showErrorMessage("This browser could not change microphone feedback suppression while recording.");
+    }
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  stopMicrophoneTracks();
+  if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+});
 
 decodeButton.addEventListener("click", () => {
   if (!currentSamples || !currentSampleRate || !decodeHistoryReady) return;
@@ -798,33 +1032,90 @@ decodeButton.addEventListener("click", () => {
   hideErrorMessage();
   showDecodeProgress({ reset: true });
 
-  const fftQuality = parseInt(qualitySelect.value, 10);
+  if (playAudioWhileDecoding?.checked && decodeAudioPlayback?.src) {
+    decodeAudioPlayback.currentTime = 0;
+    void decodeAudioPlayback.play().catch(() => {
+      if (microphoneStatus) {
+        microphoneStatus.textContent = "Decoding started. Press Play in the audio controls if playback did not start.";
+      }
+    });
+  }
+
+  const fftQuality = Number(qualitySelect.value);
   const forcedMode = modeSelect?.value === "auto" ? null : Number(modeSelect.value);
 
-  decoderWorker.postMessage({
-    samples: currentSamples,
-    sampleRate: currentSampleRate,
-    fftSize: fftQuality,
-    forcedMode,
-  });
+  try {
+    decoderWorker.postMessage({
+      samples: currentSamples,
+      sampleRate: currentSampleRate,
+      fftSize: fftQuality,
+      forcedMode,
+    });
+  } catch (error) {
+    console.error("Could not start decoder worker:", error);
+    hideDecodeProgress();
+    showErrorMessage("Could not start decoding. The audio may exceed this device's available memory.");
+    decodeButton.disabled = !decodeHistoryReady;
+  }
 });
 
 decoderWorker.onmessage = (event) => {
-  if (event.data.progress !== undefined) {
+  const data = event.data;
+  if (!data || typeof data !== "object") return;
+
+  if (data.type === "progress") {
     showDecodeProgress();
-    setDecodeProgressTarget(event.data.progress);
+    setDecodeProgressTarget(data.progress);
     return;
   }
 
-  const { imageData, width, height, error } = event.data;
+  if (data.type === "start") {
+    if (
+      !Number.isInteger(data.width) ||
+      !Number.isInteger(data.height) ||
+      data.width <= 0 ||
+      data.height <= 0 ||
+      data.width * data.height > 16_000_000
+    ) {
+      hideDecodeProgress();
+      showErrorMessage("The decoder returned invalid image dimensions.");
+      decodeButton.disabled = !decodeHistoryReady;
+      return;
+    }
+    canvas.width = data.width;
+    canvas.height = data.height;
+    ctx.clearRect(0, 0, data.width, data.height);
+    revealDecodedCanvas();
+    if (microphoneStatus) {
+      microphoneStatus.textContent = `Decoding ${data.mode || "SSTV"} — image is being reconstructed line by line.`;
+    }
+    return;
+  }
 
-  if (error) {
+  if (data.type === "line") {
+    if (
+      !Number.isInteger(data.line) ||
+      !Number.isInteger(data.width) ||
+      data.line < 0 ||
+      data.line >= canvas.height ||
+      data.width !== canvas.width ||
+      !(data.pixels instanceof ArrayBuffer) ||
+      data.pixels.byteLength !== data.width * 4
+    ) return;
+
+    const row = new ImageData(new Uint8ClampedArray(data.pixels), data.width, 1);
+    ctx.putImageData(row, 0, data.line);
+    return;
+  }
+
+  if (data.type === "error") {
+    const message = typeof data.error?.message === "string"
+      ? data.error.message.slice(0, 500)
+      : "SSTV decoding failed.";
     hideDecodeProgress({
       onComplete: () => {
         hideImageScrollHint({ immediate: true });
-
-        showErrorMessage(`Error: ${error.message}`);
-
+        showErrorMessage(`Error: ${message}`);
         updateHistoryChrome();
         decodeButton.disabled = !decodeHistoryReady;
       },
@@ -832,11 +1123,28 @@ decoderWorker.onmessage = (event) => {
     return;
   }
 
-  const imgData = new ImageData(
-    new Uint8ClampedArray(imageData),
-    width,
-    height
-  );
+  if (data.type !== "complete") return;
+
+  const { imageData, width, height } = data;
+  if (
+    !(imageData instanceof ArrayBuffer) ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width * height > 16_000_000 ||
+    imageData.byteLength !== width * height * 4
+  ) {
+    hideDecodeProgress({
+      onComplete: () => {
+        showErrorMessage("The decoder returned invalid image data.");
+        decodeButton.disabled = !decodeHistoryReady;
+      },
+    });
+    return;
+  }
+
+  const imgData = new ImageData(new Uint8ClampedArray(imageData), width, height);
 
   hideDecodeProgress({
     onComplete: async () => {
@@ -866,22 +1174,16 @@ decoderWorker.onmessage = (event) => {
         });
 
         removeEvictedFromMemory(evictedIds);
-
-        if (saveError) {
-          showErrorMessage(saveError);
-        }
+        if (saveError) showErrorMessage(saveError);
 
         const isFirstReveal = !sstvCanvasWrap?.classList.contains(
           "sstv-canvas-wrap--open"
         );
-
         canvas.width = width;
         canvas.height = height;
         ctx.putImageData(imgData, 0, 0);
 
-        if (isFirstReveal) {
-          revealDecodedCanvas();
-        }
+        if (isFirstReveal) revealDecodedCanvas();
         updateHistoryChrome();
         renderDecodeGallery();
         refreshOpenDecodeGallery(decodedImages);
@@ -889,8 +1191,9 @@ decoderWorker.onmessage = (event) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => handlePostDecodeScroll(canvas));
         });
-      } catch (err) {
-        console.error("Failed to prepare decoded image:", err);
+        if (microphoneStatus) microphoneStatus.textContent = "Decoding finished.";
+      } catch (error) {
+        console.error("Failed to prepare decoded image:", error);
         showErrorMessage("Error: Failed to display decoded image.");
       }
 
@@ -898,9 +1201,11 @@ decoderWorker.onmessage = (event) => {
     },
   });
 };
-
-decoderWorker.onerror = (e) => {
-  console.error("Worker error:", e.message, e);
+decoderWorker.onerror = (event) => {
+  console.error("Worker error:", event.message, event);
+  hideDecodeProgress();
+  showErrorMessage("The decoder worker stopped unexpectedly. Try loading the audio again.");
+  decodeButton.disabled = !decodeHistoryReady;
 };
 
 downloadImageButton.addEventListener("click", () => {
