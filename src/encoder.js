@@ -238,12 +238,9 @@ button.addEventListener("click", async () => {
     audioPlayback.src = objectUrl;
     audioPlayback.hidden = false;
 
-
-
     const playback = audioPlayback.play();
     if (playback && typeof playback.catch === "function") {
-        playback.catch(() => {
-
+      playback.catch(() => {
         status.textContent += " · Press Play to listen to the generated transmission.";
       });
     }
