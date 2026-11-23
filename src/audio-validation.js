@@ -1,4 +1,5 @@
 export const MAX_AUDIO_DURATION_SECONDS = 600;
+export const MAX_AUDIO_SAMPLE_COUNT = 30_000_000;
 
 const ALLOWED_FFT_SIZES = new Set([64, 128, 256, 512, 1024, 2048]);
 const ALLOWED_VIS_CODES = new Set([8, 12, 40, 44, 56, 60, 76]);
@@ -21,8 +22,11 @@ export function validateDecodeRequest(payload) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 192000) {
     throw new RangeError("Unsupported audio sample rate.");
   }
-  if (samples.length > sampleRate * MAX_AUDIO_DURATION_SECONDS) {
-    throw new RangeError("Audio exceeds the 10-minute decoding limit.");
+  if (
+    samples.length > sampleRate * MAX_AUDIO_DURATION_SECONDS ||
+    samples.length > MAX_AUDIO_SAMPLE_COUNT
+  ) {
+    throw new RangeError("Audio exceeds the 10-minute or 30-million-sample decoding limit.");
   }
   if (!Number.isInteger(fftSize) || !ALLOWED_FFT_SIZES.has(fftSize)) {
     throw new RangeError("Unsupported FFT size.");

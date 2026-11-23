@@ -31,9 +31,11 @@ const errorMessage = document.getElementById("errorMessage");
 const CONTACT_URL = "https://erikraft.com/";
 const MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024;
 const MAX_AUDIO_DURATION_SECONDS = 600;
+const MAX_AUDIO_SAMPLE_COUNT = 30_000_000;
 const ALLOWED_AUDIO_EXTENSIONS = /\.(wav|mp3|ogg|opus|webm|m4a|aac|flac|aif|aiff)$/i;
 
 let currentAudioUrl = null;
+let audioLoadGeneration = 0;
 let microphoneStream = null;
 let microphoneRecorder = null;
 let microphoneChunks = [];
@@ -780,6 +782,18 @@ dropZone.addEventListener("drop", (event) => {
 });
 
 async function handleAudioFile(file) {
+  const loadGeneration = ++audioLoadGeneration;
+  currentSamples = null;
+  currentSampleRate = null;
+  decodeButton.disabled = true;
+  decodeAudioPlayback.pause();
+  decodeAudioPlayback.removeAttribute("src");
+  decodeAudioPlayback.hidden = true;
+  if (currentAudioUrl) {
+    URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = null;
+  }
+
   if (!(file instanceof Blob) || file.size <= 0) {
     showErrorMessage("Choose a valid audio file.");
     return false;
@@ -820,9 +834,14 @@ async function handleAudioFile(file) {
     return false;
   }
 
-  const audioContext = new AudioContextClass();
+  let audioContext;
   try {
+    audioContext = new AudioContextClass();
     const decoded = await audioContext.decodeAudioData(await file.arrayBuffer());
+    if (loadGeneration !== audioLoadGeneration) {
+      URL.revokeObjectURL(nextAudioUrl);
+      return false;
+    }
     if (
       !Number.isFinite(decoded.duration) ||
       decoded.duration <= 0 ||
@@ -836,7 +855,8 @@ async function handleAudioFile(file) {
       !Number.isInteger(decoded.sampleRate) ||
       decoded.sampleRate < 8000 ||
       decoded.sampleRate > 192000 ||
-      samples.length > decoded.sampleRate * MAX_AUDIO_DURATION_SECONDS
+      samples.length > decoded.sampleRate * MAX_AUDIO_DURATION_SECONDS ||
+      samples.length > MAX_AUDIO_SAMPLE_COUNT
     ) {
       throw new Error("Audio exceeds the supported sample limits.");
     }
@@ -857,7 +877,7 @@ async function handleAudioFile(file) {
     showErrorMessage(error instanceof Error ? error.message : "Failed to decode the audio file.");
     return false;
   } finally {
-    await audioContext.close().catch(() => {});
+    await audioContext?.close().catch(() => {});
   }
 }
 
