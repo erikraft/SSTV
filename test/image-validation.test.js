@@ -65,3 +65,25 @@ test("rejects a file whose header does not match the declared image type", async
   const file = new Blob([new Uint8Array(24)], { type: "image/png" });
   await assert.rejects(() => readImageDimensions(file), /header is invalid/);
 });
+
+test("reads GIF logical screen dimensions", () => {
+  const bytes = new Uint8Array([
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x40, 0x01, 0x00, 0x01,
+  ]);
+  assert.deepEqual(parseImageDimensions(bytes, "image/gif"), {
+    width: 320,
+    height: 1,
+  });
+});
+
+test("reads BMP dimensions and normalizes top-down height", () => {
+  const bytes = new Uint8Array(54);
+  bytes.set([0x42, 0x4d], 0);
+  new DataView(bytes.buffer).setUint32(14, 40, true);
+  new DataView(bytes.buffer).setInt32(18, 320, true);
+  new DataView(bytes.buffer).setInt32(22, -256, true);
+  assert.deepEqual(parseImageDimensions(bytes, "image/bmp"), {
+    width: 320,
+    height: 256,
+  });
+});
