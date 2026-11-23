@@ -1,6 +1,6 @@
 ## Aviso de licença de terceiros
 
-Partes do código do decoder foram adaptadas de software distribuído sob a licença MIT. Nenhum código de seleção manual de modo foi incluído.
+Partes do código do decoder foram adaptadas de software distribuído sob a licença MIT. Nenhum código de seleção manual de modo foi incluído. O aviso de copyright e o texto integral da licença abaixo foram mantidos conforme exigido pela licença.
 
 Copyright (c) Mathieu Renaud
 

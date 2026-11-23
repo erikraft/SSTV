@@ -12,6 +12,8 @@ Browser-based SSTV Decoder & Encoder. Audio decoding and image encoding run loca
 ## Development
 Run `npm install`, `npm run dev`, and `npm run build`.
 
+## Credits
+Some decoder components include MIT-licensed third-party code. See THIRD_PARTY_NOTICES.md for the required license and copyright notice.
 
 ## Browser permissions and limits
 

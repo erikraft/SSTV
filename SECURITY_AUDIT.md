@@ -186,9 +186,9 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; refina o início real do cabeçalho com pontuação Goertzel dos quatro tons do preâmbulo (sem deslocar a imagem alguns milissegundos); usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`. A busca inicial usa passos de 5 ms e a etapa de refinamento usa passos de 0,25 ms.
 - **Limitação:** não foi fornecido o áudio que reproduziu o problema. Testes sintéticos de cabeçalho/VIS não substituem a validação com a gravação original.
 
-### Revisão do PR upstream Equinoxis/sstv-decoder#1
+### Revisão da implementação do decoder
 
-O PR contém um único commit (`afd07ebf96da8223a06773a55e2cfb3f1656a3da`). Ele adiciona seleção manual de modo VIS e, quando o modo é forçado, chama `_decodeImageData(0)`, ignorando o offset calculado do cabeçalho/VIS. Essa alteração não foi copiada. O ErikrafT SSTV mantém a detecção automática original e calcula o início da imagem após o cabeçalho.
+A implementação mantém a detecção automática do modo SSTV pelo cabeçalho VIS e calcula o início da imagem após o cabeçalho. Caminhos alternativos que ignoram esse offset não são utilizados.
 
 ### Cinco verificações prioritárias
 

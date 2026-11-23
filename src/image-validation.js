@@ -60,11 +60,9 @@ function parseGif(bytes) {
 function parseBmp(bytes) {
   if (bytes.length < 26 || ascii(bytes, 0, 2) !== "BM") return null;
   const dibSize = readUint32LE(bytes, 14);
-
   if (dibSize === 12) {
     return validateDimensions(readUint16LE(bytes, 18), readUint16LE(bytes, 20));
   }
-
   if (dibSize < 40 || bytes.length < 26) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const width = view.getInt32(18, true);

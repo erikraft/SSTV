@@ -407,6 +407,7 @@
           </div>
         </section>
 <section class="app-panel mt-6 flex w-full flex-col gap-4 p-4 sm:p-6" aria-labelledby="encoder-heading"><div class="text-center"><h2 id="encoder-heading" class="text-lg font-semibold tracking-tight text-app-text">SSTV Encoder</h2><p class="mt-1 text-sm text-app-muted">Convert an image into a downloadable SSTV WAV audio signal and play the transmission.</p></div><div class="encoder-grid"><label class="file-drop-zone" for="imageInput"><span class="file-drop-zone__title">Choose an image</span><span class="file-drop-zone__hint">PNG, JPEG, WebP, GIF, or BMP · processed locally</span><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/x-ms-bmp" hidden><p class="file-drop-zone__filename" id="imageFileName">No image selected</p></label><div class="encoder-options"><label class="sstv-quality-field__label" for="encodeMode">Encoding mode</label><select id="encodeMode" class="app-select app-select--full"><option value="44" selected>Martin 1 · 320 × 256</option><option value="40">Martin 2 · 320 × 256</option></select><label class="sstv-quality-field__label" for="imageFraming">Image framing</label><select id="imageFraming" class="app-select app-select--full"><option value="cover" selected>Fill frame · crop edges</option><option value="contain">Fit entire image · add margins</option></select><div id="imagePositionControls" class="image-position-controls" hidden><label for="imagePositionX">Horizontal crop position</label><input id="imagePositionX" type="range" min="0" max="100" value="50"><label for="imagePositionY">Vertical crop position</label><input id="imagePositionY" type="range" min="0" max="100" value="50"><p class="text-xs text-app-muted">Move the crop area to choose which part of the image is transmitted.</p></div><button type="button" id="encodeButton" class="app-btn-primary" disabled>Encode SSTV</button><a id="downloadAudio" class="app-btn-secondary" hidden download="erikraft-sstv.wav">Download WAV</a><audio id="encodeAudioPlayback" class="encoder-audio-player" controls hidden></audio><p id="encodeStatus" class="text-sm text-app-muted" role="status">Select an image to begin.</p></div></div><div class="encoder-preview-wrap"><canvas id="encodePreview" class="encoder-preview" width="320" height="256" aria-label="Image preview"></canvas></div></section>
+<section class="app-panel mt-6 flex w-full flex-col gap-4 p-4 sm:p-6" aria-labelledby="encoder-heading"><div class="text-center"><h2 id="encoder-heading" class="text-lg font-semibold tracking-tight text-app-text">SSTV Encoder</h2><p class="mt-1 text-sm text-app-muted">Convert an image into a downloadable SSTV WAV audio signal and play the transmission.</p></div><div class="encoder-grid"><label class="file-drop-zone" for="imageInput"><span class="file-drop-zone__title">Choose an image</span><span class="file-drop-zone__hint">PNG, JPEG, WebP, GIF, or BMP · processed locally</span><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/x-ms-bmp" hidden><p class="file-drop-zone__filename" id="imageFileName">No image selected</p></label><div class="encoder-options"><label class="sstv-quality-field__label" for="encodeMode">Encoding mode</label><select id="encodeMode" class="app-select app-select--full"><option value="44" selected>Martin 1 · 320 × 256</option><option value="40">Martin 2 · 320 × 256</option></select><label class="sstv-quality-field__label" for="imageFraming">Image framing</label><select id="imageFraming" class="app-select app-select--full"><option value="cover" selected>Fill frame · crop edges</option><option value="contain">Fit entire image · add margins</option></select><div id="imagePositionControls" class="image-position-controls" hidden><label for="imagePositionX">Horizontal crop position</label><input id="imagePositionX" type="range" min="0" max="100" value="50"><label for="imagePositionY">Vertical crop position</label><input id="imagePositionY" type="range" min="0" max="100" value="50"><p class="text-xs text-app-muted">Move the crop area to choose which part of the image is transmitted.</p></div><button type="button" id="encodeButton" class="app-btn-primary" disabled>Encode SSTV</button><a id="downloadAudio" class="app-btn-secondary" hidden download="erikraft-sstv.wav">Download WAV</a><audio id="encodeAudioPlayback" class="encoder-audio-player" controls hidden></audio><p id="encodeStatus" class="text-sm text-app-muted" role="status">Select an image to begin.</p></div></div><div class="encoder-preview-wrap"><canvas id="encodePreview" class="encoder-preview" width="320" height="256" aria-label="Image preview"></canvas></div></section>
       </main>
 
       <article
@@ -433,7 +434,7 @@
             <li><a class="seo-doc-toc__link" href="#decoding-process">Decoding Process</a></li>
             <li><a class="seo-doc-toc__link" href="#technical-characteristics">Technical Characteristics</a></li>
             <li><a class="seo-doc-toc__link" href="#use-cases">Use Cases and Practical Applications</a></li>
-            <li><a class="seo-doc-toc__link" href="#modern-tools">Modern SSTV Decoding Tools</a></li>
+            <li><a class="seo-doc-toc__link" href="#modern-tools">This SSTV Tool</a></li>
             <li><a class="seo-doc-toc__link" href="#conclusion">Conclusion</a></li>
             <li><a class="seo-doc-toc__link" href="#frequently-asked-questions">FAQ</a></li>
             <li><a class="seo-doc-toc__link" href="#connect-with-erikraft">Connect with ErikrafT</a></li>
@@ -621,56 +622,11 @@
           </section>
 
           <section id="modern-tools" class="seo-doc-section">
-            <h3 class="seo-doc-h3">Modern SSTV Decoding Tools</h3>
+            <h3 class="seo-doc-h3">This SSTV Tool</h3>
             <p>
-              SSTV decoding used to rely on desktop applications such as
-              <strong>MMSSTV</strong> and <strong>RX-SSTV</strong>, typically
-              available for Windows operating systems. Today, advancements in web
-              technologies allow users to decode SSTV transmissions directly in their
-              browser using <strong>JavaScript</strong> and the
-              <strong>Web Audio API</strong>. This provides cross-platform access and
-              eliminates the need for software installation, making SSTV more
-              accessible to beginners, educators, and hobbyists.
-            </p>
-            <p>
-              This web-based <strong>SSTV Decoder</strong> is inspired by the
-              open-source project
-              <a
-                href="https://github.com/colaclanth/sstv"
-                class="seo-doc-a"
-                target="_blank"
-                rel="nofollow noopener"
-                >sstv on GitHub</a
-              >, which implements image decoding in Python. For mobile users and
-              offline decoding, the following applications are also recommended:
-            </p>
-            <ul class="seo-doc-ul">
-              <li>
-                <strong>SSTV Decoder (Android)</strong>: Decode SSTV signals using
-                your phone’s microphone or audio input -
-                <a
-                  href="https://play.google.com/store/apps/details?id=xdsopl.robot36"
-                  class="seo-doc-a"
-                  target="_blank"
-                  rel="nofollow noopener"
-                  >Robot36 on Google Play</a
-                >
-              </li>
-              <li>
-                <strong>SSTV Encoder (Android)</strong>: Generate and transmit SSTV
-                signals using image files -
-                <a
-                  href="https://play.google.com/store/apps/details?id=om.sstvencoder"
-                  class="seo-doc-a"
-                  target="_blank"
-                  rel="nofollow noopener"
-                  >SSTV Encoder on Google Play</a
-                >
-              </li>
-            </ul>
-            <p>
-              These tools support various SSTV modes and are ideal for field
-              experiments, portable ham radio setups, and educational activities.
+              This browser-based application decodes SSTV audio recordings and
+              encodes locally selected images into SSTV audio. Processing stays
+              on your device; no image or audio file is uploaded to a server.
             </p>
           </section>
 
