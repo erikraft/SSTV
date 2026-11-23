@@ -1,6 +1,7 @@
 @import "@fontsource-variable/inter";
 @import "tailwindcss";
 @import "./sstv-ui.css";
+@import "./visual-theme.css";
 
 /* Align Tailwind `dark:` with app tokens (html.light / html.dark / system), not OS alone */
 @custom-variant dark {
