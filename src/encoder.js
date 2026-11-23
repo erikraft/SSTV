@@ -83,7 +83,7 @@ input.addEventListener("change", async () => {
     image = null;
     button.disabled = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (cropControls) cropControls.hidden = true;
+    positionControls.hidden = true;
     status.textContent =
       "Choose a supported raster image (PNG, JPEG, WebP, GIF, or BMP) smaller than 15 MB.";
     input.value = "";
@@ -228,7 +228,7 @@ button.addEventListener("click", async () => {
     tone(parity ? 1100 : 1300, 0.03);
     tone(1200, 0.03);
 
-    renderPreview();
+    renderImagePreview();
     const data = ctx.getImageData(0, 0, 320, 256).data;
     const scanChannel = (y, channel) => {
       for (let x = 0; x < 320; x++) {
