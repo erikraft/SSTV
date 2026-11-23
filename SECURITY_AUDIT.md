@@ -227,3 +227,37 @@ O PR contém um único commit (`afd07ebf96da8223a06773a55e2cfb3f1656a3da`). Ele 
 - Nenhuma CVE ou vulnerabilidade de dependência foi inventada.
 
 **Conclusão complementar:** a superfície de ataque continua limitada a uma SPA estática e ao processamento local. A correção mantém a detecção automática sem o seletor manual, alinha o início do sinal antes de decodificar pixels, remove o efeito Matrix e endurece a estimativa de frequência. A auditoria de supply chain e a validação com o áudio real permanecem pendentes.
+
+
+---
+
+## 7. Auditoria complementar — encoder, enquadramento e referências externas
+
+### SSTV-08 — Rampa de volume aplicada individualmente a cada pixel transmitido
+
+- **Criticidade:** ALTA para a integridade da imagem codificada (não é execução remota).
+- **Confiança:** CONFIRMADA.
+- **Evidência:** `src/encoder.js` aplicava uma janela de ataque/decay de 24 amostras em cada chamada de `tone()`. No modo Martin 2, um pixel dura aproximadamente 2,52 amostras a 11.025 Hz; no Martin 1, aproximadamente 5,04 amostras. A rampa reduzia a amplitude de praticamente todos os pixels.
+- **Impacto:** os tons que representam a intensidade de cada pixel chegavam com amplitude reduzida, prejudicando a recuperação da imagem ao decodificar o WAV gerado.
+- **Correção:** gerador de tons com fase contínua e sem envelope individual por pixel; teste dedicado para amplitude de tons curtos e continuidade de fase.
+
+### SSTV-09 — Enquadramento automático fixo sem controles de recorte
+
+- **Criticidade:** BAIXA (qualidade funcional).
+- **Confiança:** CONFIRMADA.
+- **Evidência:** o encoder aplicava um recorte central fixo para preencher 320 × 256, sem controles para ajustar zoom ou posição.
+- **Impacto:** partes importantes de imagens com proporções diferentes podiam ser cortadas sem possibilidade de ajuste.
+- **Correção:** prévia com recorte automático central e controles de zoom, posição horizontal e vertical. A proporção permanece 320 × 256, conforme os modos Martin 1 e Martin 2 disponíveis.
+
+### SSTV-10 — Formatos de imagem raster limitados
+
+- **Criticidade:** BAIXA (compatibilidade).
+- **Confiança:** CONFIRMADA.
+- **Evidência:** a validação pré-decodificação aceitava apenas PNG, JPEG e WebP.
+- **Correção:** inclusão de GIF e BMP com leitura limitada de cabeçalho e validação de dimensões antes da decodificação. SVG permanece excluído por ser um formato vetorial ativo e não necessário ao fluxo de SSTV.
+
+### Limites desta revisão
+
+- O áudio original que produziu a imagem corrompida não foi fornecido; a correção foi baseada no defeito demonstrável no encoder e em testes unitários sintéticos.
+- Não foi executado `npm test`, build Vite ou `npm audit` nesta sessão. Os novos testes foram adicionados ao repositório, mas ainda precisam ser executados em CI.
+- O processamento continua no navegador e sem upload de arquivos.
