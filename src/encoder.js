@@ -1,3 +1,10 @@
+import {
+  readImageDimensions,
+  MAX_IMAGE_FILE_SIZE,
+  MAX_IMAGE_PIXELS,
+  MAX_IMAGE_DIMENSION,
+} from "./image-validation.js";
+
 const input = document.getElementById("imageInput");
 const name = document.getElementById("imageFileName");
 const mode = document.getElementById("encodeMode");
@@ -9,15 +16,11 @@ const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
 const previewWrap = document.getElementById("encoderPreviewWrap");
 
-const MAX_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
-const MAX_IMAGE_PIXELS = 16_000_000;
-const MAX_IMAGE_DIMENSION = 8192;
-
 let image = null;
 let objectUrl = null;
 let imageLoadGeneration = 0;
 
-input.addEventListener("change", () => {
+input.addEventListener("change", async () => {
   const file = input.files?.[0];
   if (!file) return;
 
@@ -51,9 +54,24 @@ input.addEventListener("change", () => {
   }
 
   button.disabled = true;
-  link.hidden = true;
-  status.textContent = "Loading image…";
+  status.textContent = "Checking image dimensions…";
 
+  try {
+    await readImageDimensions(file);
+  } catch (error) {
+    if (loadGeneration !== imageLoadGeneration) return;
+    image = null;
+    button.disabled = true;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    status.textContent = error instanceof Error
+      ? error.message
+      : "Could not verify this image safely.";
+    input.value = "";
+    return;
+  }
+
+  if (loadGeneration !== imageLoadGeneration) return;
+  status.textContent = "Loading image…";
   const url = URL.createObjectURL(file);
   const img = new Image();
 
@@ -220,13 +238,14 @@ button.addEventListener("click", async () => {
 
     audioPlayback.src = objectUrl;
     audioPlayback.hidden = false;
+    audioPlayback.onplay = () => previewWrap.classList.add("is-transmitting");
     audioPlayback.onended = () => previewWrap.classList.remove("is-transmitting");
     audioPlayback.onpause = () => previewWrap.classList.remove("is-transmitting");
     previewWrap.classList.add("is-transmitting");
 
     const playback = audioPlayback.play();
     if (playback && typeof playback.catch === "function") {
-      playback.catch(() => {
+        playback.catch(() => {
         previewWrap.classList.remove("is-transmitting");
         status.textContent += " · Press Play to listen to the generated transmission.";
       });

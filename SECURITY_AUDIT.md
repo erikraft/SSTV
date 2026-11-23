@@ -21,6 +21,7 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 | SSTV-03 | MÉDIA | PROVÁVEL | Não verificável sem instalação/auditoria das dependências; lockfile ausente |
 | SSTV-04 | BAIXA | CONFIRMADA | Corrigido nesta PR — falha do Worker podia deixar a interface de decodificação travada |
 | SSTV-05 | BAIXA | CONFIRMADA | Endurecido nesta PR — construção de mensagem de erro por `innerHTML`, embora o texto variável estivesse escapado |
+| SSTV-06 | MÉDIA | CONFIRMADA | Corrigido nesta PR — dimensões da imagem eram verificadas somente após a decodificação do navegador |
 
 ### SSTV-01 — Consumo excessivo de memória/CPU ao decodificar áudio
 
@@ -67,6 +68,16 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - **Evidência na base auditada:** `src/decoder.js:38` interpolava uma mensagem em `innerHTML`, mas a função `escapeHtml()` escapava os caracteres HTML do texto variável e o link de contato era constante.
 - **Impacto:** mantém uma superfície de injeção DOM desnecessária. A evidência disponível não prova que um atacante consiga executar JavaScript.
 - **Correção nesta PR:** construção com `createElement`, `textContent` e `replaceChildren`; removida a necessidade de HTML interpolado.
+
+
+### SSTV-06 — Decodificação de imagem antes de validar dimensões
+
+- **Criticidade:** MÉDIA
+- **Confiança:** CONFIRMADA
+- **Evidência na base auditada:** `src/encoder.js:10-12` definia limites de 15 MB, 8192 pixels por dimensão e 16 megapixels; porém `src/encoder.js:35-48` criava e carregava um elemento `Image` antes de conferir `naturalWidth`, `naturalHeight` e a contagem de pixels.
+- **Impacto plausível:** uma imagem comprimida pequena com dimensões extremas pode exigir muita memória durante a decodificação nativa antes de a validação JavaScript ser executada. O cenário exige que o visitante selecione o arquivo; não prova execução remota de código.
+- **Correção nesta PR:** leitura limitada de cabeçalhos PNG, JPEG e WebP (até 2 MiB) e validação de dimensões/pixels antes de criar o elemento `Image`. A validação após o carregamento permanece como segunda barreira.
+- **Limitação residual:** JPEGs com metadados anteriores ao marcador de frame além dos primeiros 2 MiB são rejeitados por segurança. A análise de cabeçalho não substitui as proteções internas do decodificador de imagem do navegador.
 
 ## 2. Reconhecimento
 
@@ -129,7 +140,7 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 | A03 — Software Supply Chain Failures | Lockfile ausente e intervalos de versão: SSTV-03. Auditoria de advisories pendente; nenhum CVE foi declarado sem evidência. |
 | A04 — Cryptographic Failures | Não foram encontrados armazenamento de senhas, tráfego de pagamento, segredos criptográficos ou dados sensíveis remotos. `crypto.randomUUID()` é usado para IDs locais, não como mecanismo de autenticação. |
 | A05 — Injection | Não foram encontrados SQL, comandos de sistema, `eval` ou `new Function`. O `innerHTML` encontrado usava escape explícito; foi removido por defesa em profundidade (SSTV-05). |
-| A06 — Insecure Design | Limites de processamento de áudio eram incompletos (SSTV-01). A validação foi reforçada no cliente e no Worker. |
+| A06 — Insecure Design | Limites de processamento de áudio (SSTV-01) e validação tardia de dimensões de imagem (SSTV-06) foram corrigidos com verificações antes do processamento e validação adicional no Worker. |
 | A07 — Authentication Failures | Não há autenticação implementada; não existem login, recuperação de senha ou OTP para testar. |
 | A08 — Software or Data Integrity Failures | Não foram encontrados scripts executáveis de terceiros carregados de CDN nem mecanismos de atualização remota de código. O risco de dependências sem lockfile está registrado em A03. |
 | A09 — Security Logging and Alerting Failures | Não há backend ou eventos de autenticação/segurança para monitoramento centralizado. Erros são registrados localmente no console; não foi encontrada integração de alertas. |
@@ -143,7 +154,7 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 - Leitura dos arquivos de entrada, encoder, decoder, Worker, decoder SSTV, IndexedDB, consentimento, pacote e configuração Vercel.
 - Busca no código por padrões comuns de segredos e APIs/endpoints.
 - Revisão dos metadados dos commits recentes.
-- Cinco testes unitários da validação estrita do payload do Worker executados com Node.js em ambiente isolado: 5 passaram, 0 falharam. O helper e os casos de teste foram executados sem instalar as dependências Vite do projeto.
+- Dez testes unitários de validação de áudio e cabeçalhos/dimensões de imagem executados com Node.js em ambiente isolado: 10 passaram, 0 falharam. Os testes foram executados sem instalar as dependências Vite do projeto. O helper e os casos de teste foram executados sem instalar as dependências Vite do projeto.
 
 ### Não executado / não verificável
 
