@@ -756,7 +756,11 @@ dropZone.addEventListener("drop", (event) => {
 function handleAudioFile(file) {
   currentSourceFileName = file.name;
   dropZone.classList.add("has-file");
-  audioFileNameDisplay.innerHTML = `Selected file: <span class="font-medium text-app-accent">${file.name}</span>`;
+  audioFileNameDisplay.replaceChildren(document.createTextNode("Selected file: "));
+  const selectedFileName = document.createElement("span");
+  selectedFileName.className = "font-medium text-app-accent";
+  selectedFileName.textContent = file.name;
+  audioFileNameDisplay.append(selectedFileName);
   const reader = new FileReader();
 
   reader.onload = async () => {
