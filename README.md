@@ -13,7 +13,7 @@ Browser-based SSTV Decoder & Encoder. Audio decoding and image encoding run loca
 Run `npm install`, `npm run dev`, and `npm run build`.
 
 ## Credits
-Decoder implementation adapted from https://github.com/Equinoxis/sstv-decoder. See THIRD_PARTY_NOTICES.md.
+Some decoder components include MIT-licensed third-party code. See THIRD_PARTY_NOTICES.md for the required license and copyright notice.
 
 ## Browser permissions and limits
 

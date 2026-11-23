@@ -4,6 +4,7 @@ import {
   MAX_IMAGE_PIXELS,
   MAX_IMAGE_DIMENSION,
 } from "./image-validation.js";
+import { appendTone } from "./encoder-audio.js";
 
 const input = document.getElementById("imageInput");
 const name = document.getElementById("imageFileName");
@@ -14,10 +15,65 @@ const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
+const cropZoom = document.getElementById("cropZoom");
+const cropX = document.getElementById("cropX");
+const cropY = document.getElementById("cropY");
+const cropZoomValue = document.getElementById("cropZoomValue");
+const cropXValue = document.getElementById("cropXValue");
+const cropYValue = document.getElementById("cropYValue");
+const cropControls = document.getElementById("cropControls");
 
 let image = null;
 let objectUrl = null;
 let imageLoadGeneration = 0;
+
+function getCropRect() {
+  if (!image) return null;
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const targetRatio = canvas.width / canvas.height;
+  let sourceWidth = width;
+  let sourceHeight = height;
+
+  if (width / height > targetRatio) sourceWidth = height * targetRatio;
+  else sourceHeight = width / targetRatio;
+
+  const zoom = Math.max(1, Number(cropZoom?.value || 100) / 100);
+  sourceWidth /= zoom;
+  sourceHeight /= zoom;
+  const maxX = Math.max(0, width - sourceWidth);
+  const maxY = Math.max(0, height - sourceHeight);
+  return {
+    x: maxX * (Number(cropX?.value || 50) / 100),
+    y: maxY * (Number(cropY?.value || 50) / 100),
+    width: sourceWidth,
+    height: sourceHeight,
+  };
+}
+
+function renderPreview() {
+  if (!image) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  const crop = getCropRect();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height,
+    0, 0, canvas.width, canvas.height);
+}
+
+function updateCropLabels() {
+  if (cropZoomValue) cropZoomValue.textContent = `${cropZoom.value}%`;
+  if (cropXValue) cropXValue.textContent = `${cropX.value}%`;
+  if (cropYValue) cropYValue.textContent = `${cropY.value}%`;
+}
+
+for (const control of [cropZoom, cropX, cropY]) {
+  control?.addEventListener("input", () => {
+    updateCropLabels();
+    renderPreview();
+  });
+}
 
 input.addEventListener("change", async () => {
   const file = input.files?.[0];
@@ -26,6 +82,7 @@ input.addEventListener("change", async () => {
   const loadGeneration = ++imageLoadGeneration;
   image = null;
   button.disabled = true;
+  if (cropControls) cropControls.hidden = true;
 
   audioPlayback.pause();
   audioPlayback.hidden = true;
@@ -39,15 +96,16 @@ input.addEventListener("change", async () => {
   }
 
   if (
-    !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+    !["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp"].includes(file.type) ||
     file.size <= 0 ||
     file.size > MAX_IMAGE_FILE_SIZE
   ) {
     image = null;
     button.disabled = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (cropControls) cropControls.hidden = true;
     status.textContent =
-      "Choose a PNG, JPEG, or WebP image smaller than 15 MB.";
+      "Choose a PNG, JPEG, WebP, GIF, or BMP image smaller than 15 MB.";
     input.value = "";
     return;
   }
@@ -101,13 +159,12 @@ input.addEventListener("change", async () => {
     }
 
     image = img;
-    const scale = Math.max(320 / width, 256 / height);
-    const w = width * scale;
-    const h = height * scale;
-
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, 320, 256);
-    ctx.drawImage(img, (320 - w) / 2, (256 - h) / 2, w, h);
+    if (cropZoom) cropZoom.value = "100";
+    if (cropX) cropX.value = "50";
+    if (cropY) cropY.value = "50";
+    updateCropLabels();
+    renderPreview();
+    if (cropControls) cropControls.hidden = false;
 
     URL.revokeObjectURL(url);
     name.textContent = file.name;
@@ -179,17 +236,8 @@ button.addEventListener("click", async () => {
     const scan = vis === 40 ? 0.073216 : 0.146432;
     const pixel = scan / 320;
     const samples = [];
-    let phase = 0;
-
-    const tone = (freq, seconds) => {
-      const n = Math.max(1, Math.round(seconds * rate));
-      for (let i = 0; i < n; i++) {
-        const env = Math.min(1, i / 24, (n - i) / 24);
-        samples.push(Math.sin(phase) * 0.72 * Math.max(0, env));
-        phase += (2 * Math.PI * freq) / rate;
-        if (phase > Math.PI * 2) phase -= Math.PI * 2;
-      }
-    };
+    const phase = { value: 0 };
+    const tone = (freq, seconds) => appendTone(samples, phase, freq, seconds, rate);
 
     tone(1900, 0.3);
     tone(1200, 0.01);
@@ -206,6 +254,7 @@ button.addEventListener("click", async () => {
     tone(parity ? 1100 : 1300, 0.03);
     tone(1200, 0.03);
 
+    renderPreview();
     const data = ctx.getImageData(0, 0, 320, 256).data;
     const scanChannel = (y, channel) => {
       for (let x = 0; x < 320; x++) {

@@ -27,7 +27,7 @@ const decodeButton = document.getElementById("decodeButton");
 const downloadImageButton = document.getElementById("downloadImageButton");
 const feedbackCard = document.getElementById("feedbackCard");
 const errorMessage = document.getElementById("errorMessage");
-const CONTACT_URL = "https://erikraft.com/";
+const CONTACT_URL = "https://github.com/erikraft/SSTV/issues/new/choose";
 const MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024;
 const MAX_AUDIO_DURATION_SECONDS = 600;
 const MAX_AUDIO_SAMPLE_COUNT = 30_000_000;
@@ -54,7 +54,7 @@ function showErrorMessage(message) {
   contactLink.href = CONTACT_URL;
   contactLink.target = "_blank";
   contactLink.rel = "noopener noreferrer";
-  contactLink.textContent = "contact me";
+  contactLink.textContent = "open an issue";
   contactText.append(
     "If you think this should work, feel free to ",
     contactLink,
