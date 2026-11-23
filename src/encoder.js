@@ -14,10 +14,44 @@ const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
+const framing = document.getElementById("imageFraming");
+const positionX = document.getElementById("imagePositionX");
+const positionY = document.getElementById("imagePositionY");
+const positionControls = document.getElementById("imagePositionControls");
 
 let image = null;
 let objectUrl = null;
 let imageLoadGeneration = 0;
+
+function renderImagePreview() {
+  if (!image) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const fill = framing.value === "cover";
+  const scale = (fill ? Math.max : Math.min)(
+    canvas.width / width,
+    canvas.height / height
+  );
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  const horizontal = Number(positionX.value) / 100;
+  const vertical = Number(positionY.value) / 100;
+  const x = (canvas.width - drawWidth) * (fill ? horizontal : 0.5);
+  const y = (canvas.height - drawHeight) * (fill ? vertical : 0.5);
+
+  ctx.fillStyle = "#08090c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, x, y, drawWidth, drawHeight);
+  positionControls.hidden = !fill;
+}
+
+framing.addEventListener("change", renderImagePreview);
+positionX.addEventListener("input", renderImagePreview);
+positionY.addEventListener("input", renderImagePreview);
 
 input.addEventListener("change", async () => {
   const file = input.files?.[0];
@@ -39,7 +73,7 @@ input.addEventListener("change", async () => {
   }
 
   if (
-    !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+    !["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-ms-bmp"].includes(file.type) ||
     file.size <= 0 ||
     file.size > MAX_IMAGE_FILE_SIZE
   ) {
@@ -47,7 +81,7 @@ input.addEventListener("change", async () => {
     button.disabled = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     status.textContent =
-      "Choose a PNG, JPEG, or WebP image smaller than 15 MB.";
+      "Choose a supported raster image (PNG, JPEG, WebP, GIF, or BMP) smaller than 15 MB.";
     input.value = "";
     return;
   }
@@ -101,18 +135,12 @@ input.addEventListener("change", async () => {
     }
 
     image = img;
-    const scale = Math.max(320 / width, 256 / height);
-    const w = width * scale;
-    const h = height * scale;
-
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, 320, 256);
-    ctx.drawImage(img, (320 - w) / 2, (256 - h) / 2, w, h);
+    renderImagePreview();
 
     URL.revokeObjectURL(url);
     name.textContent = file.name;
     button.disabled = false;
-    status.textContent = "Ready to encode locally.";
+    status.textContent = "Image ready. Adjust the framing, then encode locally.";
     link.hidden = true;
   };
 
@@ -179,17 +207,7 @@ button.addEventListener("click", async () => {
     const scan = vis === 40 ? 0.073216 : 0.146432;
     const pixel = scan / 320;
     const samples = [];
-    let phase = 0;
-
-    const tone = (freq, seconds) => {
-      const n = Math.max(1, Math.round(seconds * rate));
-      for (let i = 0; i < n; i++) {
-        const env = Math.min(1, i / 24, (n - i) / 24);
-        samples.push(Math.sin(phase) * 0.72 * Math.max(0, env));
-        phase += (2 * Math.PI * freq) / rate;
-        if (phase > Math.PI * 2) phase -= Math.PI * 2;
-      }
-    };
+    const tone = createToneWriter(rate, samples);
 
     tone(1900, 0.3);
     tone(1200, 0.01);
@@ -227,6 +245,7 @@ button.addEventListener("click", async () => {
       tone(1500, 0.000572);
     }
 
+    applyTransmissionEdgeFade(samples, rate);
     const blob = makeWav(samples, rate);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(blob);
