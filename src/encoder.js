@@ -82,6 +82,7 @@ input.addEventListener("change", async () => {
   const loadGeneration = ++imageLoadGeneration;
   image = null;
   button.disabled = true;
+  if (cropControls) cropControls.hidden = true;
 
   audioPlayback.pause();
   audioPlayback.hidden = true;
@@ -102,6 +103,7 @@ input.addEventListener("change", async () => {
     image = null;
     button.disabled = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (cropControls) cropControls.hidden = true;
     status.textContent =
       "Choose a PNG, JPEG, WebP, GIF, or BMP image smaller than 15 MB.";
     input.value = "";
