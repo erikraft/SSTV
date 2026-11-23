@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import SSTVDecoder from "../src/sstv/decoder.js";
-import { barycentricPeakInterp } from "../src/utils.js";
+import { parabolicPeakInterp } from "../src/utils.js";
 
 function makeSstvHeader(visCode, sampleRate = 11025, leadingSilenceSeconds = 0.123) {
   const samples = new Array(Math.round(sampleRate * leadingSilenceSeconds)).fill(0);
@@ -58,7 +58,7 @@ for (const [visCode, expectedName] of [
 
 test("parabolic peak interpolation estimates a fractional FFT bin", () => {
   const bins = new Float64Array([0, 2, 6, 10, 8, 1, 0]);
-  const peak = barycentricPeakInterp(bins, 3);
+  const peak = parabolicPeakInterp(bins, 3);
   assert.ok(peak > 3);
   assert.ok(peak < 3.5);
 });

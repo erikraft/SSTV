@@ -181,7 +181,7 @@ Os riscos concretos concentram-se em disponibilidade do navegador ao processar �
 
 - **Criticidade:** MÉDIA (confiabilidade e disponibilidade do processamento local).
 - **Confiança:** CONFIRMADA quanto às fragilidades algorítmicas no código; a causa exata da gravação que o usuário decodificou permanece NÃO VERIFICÁVEL sem o arquivo original.
-- **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições; e a função `barycentricPeakInterp` em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
+- **Evidência da base:** `src/sstv/decoder.js` selecionava o maior pico de todo o espectro sem limitar a faixa de frequências analisada; as janelas do cabeçalho eram posicionadas no começo dos segmentos, próximas às transições; e a função de interpolação de pico em `src/utils.js` aplicava um deslocamento sub-bin com fator incorreto para a interpolação parabólica.
 - **Impacto plausível:** interferência forte fora da banda SSTV, bordas de tom ou estimativas de frequência imprecisas podem atrapalhar a identificação do cabeçalho/VIS e a leitura de tons de pixel, gerando falha ou imagem degradada.
 - **Correção nesta PR:** restringe a busca de picos às bandas esperadas; centraliza as janelas de amostragem do cabeçalho e dos bits VIS; usa interpolação parabólica limitada a meio bin; mantém somente a detecção automática e remove o caminho `forcedMode`.
 - **Limitação:** não foi fornecido o áudio que reproduziu o problema. Testes sintéticos de cabeçalho/VIS não substituem a validação com a gravação original.

@@ -1,6 +1,6 @@
 import {
   freqToLum,
-  barycentricPeakInterp,
+  parabolicPeakInterp,
   hannWindow,
   fft,
   yuvToRgb,
@@ -59,7 +59,7 @@ class SSTVDecoder {
       }
     }
     if (!Number.isFinite(peakMagnitude) || peakMagnitude <= 0) return Number.NaN;
-    return barycentricPeakInterp(spectrum, peakBin) * binWidth;
+    return parabolicPeakInterp(spectrum, peakBin) * binWidth;
   }
 
   _tonePower(data, frequency) {
@@ -86,7 +86,7 @@ class SSTVDecoder {
   _findHeader() {
     const headerSize = Math.round(HDR_SIZE * this.sampleRate);
     const windowSize = Math.round(HDR_WINDOW_SIZE * this.sampleRate);
-    const jumpSize = Math.max(1, Math.round(0.002 * this.sampleRate));
+    const jumpSize = Math.max(1, Math.round(0.005 * this.sampleRate));
     const windowSeconds = windowSize / this.sampleRate;
     const centeredWindowStart = (segmentStart, segmentEnd) =>
       Math.round((segmentStart + (segmentEnd - segmentStart - windowSeconds) / 2) * this.sampleRate);

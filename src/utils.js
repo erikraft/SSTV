@@ -10,7 +10,7 @@ export function lumToFreq(lum) {
   return 1500 + clampedLum * 3.1372549;
 }
 
-export function barycentricPeakInterp(bins, x) {
+export function parabolicPeakInterp(bins, x) {
   if (!bins || !Number.isInteger(x) || x <= 0 || x >= bins.length - 1) return x;
   const left = bins[x - 1];
   const center = bins[x];

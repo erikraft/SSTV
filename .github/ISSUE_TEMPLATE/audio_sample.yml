@@ -1,9 +1,6 @@
 name: SSTV audio sample for decoder testing
 description: Share a public-safe SSTV recording that can help reproduce or investigate a decoding issue.
 title: "[Audio sample]: "
-labels:
-  - decoder
-  - audio-sample
 body:
   - type: markdown
     attributes:
