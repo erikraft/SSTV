@@ -41,7 +41,7 @@
         closed = !closed;
         updateIcon(closed ? closedEyes : openEyes);
       }
-      schedule(closed ? 800 : 150);
+      schedule(closed ? 150 : 800);
     }, delay);
   };
 
