@@ -15,10 +15,6 @@ const status = document.getElementById("encodeStatus");
 const canvas = document.getElementById("encodePreview");
 const ctx = canvas.getContext("2d");
 const audioPlayback = document.getElementById("encodeAudioPlayback");
-const framing = document.getElementById("imageFraming");
-const positionX = document.getElementById("imagePositionX");
-const positionY = document.getElementById("imagePositionY");
-const positionControls = document.getElementById("imagePositionControls");
 
 let image = null;
 let objectUrl = null;
@@ -27,33 +23,24 @@ let imageLoadGeneration = 0;
 function renderImagePreview() {
   if (!image) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    positionControls.hidden = true;
     return;
   }
 
   const width = image.naturalWidth;
   const height = image.naturalHeight;
-  const fill = framing.value === "cover";
-  const scale = (fill ? Math.max : Math.min)(
+  const scale = Math.min(
     canvas.width / width,
     canvas.height / height
   );
   const drawWidth = width * scale;
   const drawHeight = height * scale;
-  const horizontal = Number(positionX.value) / 100;
-  const vertical = Number(positionY.value) / 100;
-  const x = (canvas.width - drawWidth) * (fill ? horizontal : 0.5);
-  const y = (canvas.height - drawHeight) * (fill ? vertical : 0.5);
+  const x = (canvas.width - drawWidth) / 2;
+  const y = (canvas.height - drawHeight) / 2;
 
   ctx.fillStyle = "#08090c";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(image, x, y, drawWidth, drawHeight);
-  positionControls.hidden = !fill;
 }
-
-framing.addEventListener("change", renderImagePreview);
-positionX.addEventListener("input", renderImagePreview);
-positionY.addEventListener("input", renderImagePreview);
 
 input.addEventListener("change", async () => {
   const file = input.files?.[0];
@@ -82,7 +69,6 @@ input.addEventListener("change", async () => {
     image = null;
     button.disabled = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    positionControls.hidden = true;
     status.textContent =
       "Choose a supported raster image (PNG, JPEG, WebP, GIF, or BMP) smaller than 15 MB.";
     input.value = "";
@@ -143,7 +129,7 @@ input.addEventListener("change", async () => {
     URL.revokeObjectURL(url);
     name.textContent = file.name;
     button.disabled = false;
-    status.textContent = "Image ready. Adjust the framing, then encode locally.";
+    status.textContent = "Image ready. Fit entire image with margins, then encode locally.";
     link.hidden = true;
   };
 
