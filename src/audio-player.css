@@ -188,3 +188,26 @@
 		transition: none;
 	}
 }
+
+@media (forced-colors: active) {
+	.sstv-audio-player__controls > .sstv-audio-player__button {
+		color: ButtonText;
+		border-color: ButtonText;
+	}
+
+	.sstv-audio-player__controls > .sstv-audio-player__button::before {
+		border-left-color: ButtonText;
+	}
+
+	.sstv-audio-player__controls > .sstv-audio-player__button[aria-label="Pause audio"]::before {
+		border: 0 solid currentColor;
+		border-right-width: 2px;
+		border-left-width: 2px;
+		background: none;
+	}
+
+	.sstv-audio-player__range {
+		border: 1px solid CanvasText;
+		box-shadow: none;
+	}
+}
