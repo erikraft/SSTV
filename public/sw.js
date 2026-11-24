@@ -1,7 +1,7 @@
-const CACHE_NAME = "erikraft-sstv-v1";
+const CACHE_NAME = "erikraft-sstv-v2";
 const APP_SHELL = [
   "/",
-  "/favicon.ico",
+  "/favicon.png",
   "/manifest.webmanifest",
   "/ErikrafT-SSTV_LogoV1.jpg",
   "/ErikrafT-SSTV-192.png",
