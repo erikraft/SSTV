@@ -11,6 +11,7 @@ import {
 } from "./decode-history-store.js";
 import { showConfirmDialog } from "./confirm-dialog.js";
 import { getSstvDecodedImageDownloadName } from "./download-name.js";
+import { mergeAudioChunks } from "./microphone-audio.js";
 
 const audioInput = document.getElementById("audioInput");
 const microphoneStartButton = document.getElementById("microphoneStartButton");
@@ -39,6 +40,16 @@ let audioLoadGeneration = 0;
 let microphoneStream = null;
 let microphoneRecorder = null;
 let microphoneChunks = [];
+let microphoneAudioContext = null;
+let microphoneAudioSource = null;
+let microphoneAudioProcessor = null;
+let microphoneAudioGain = null;
+let microphoneSampleChunks = [];
+let microphoneSampleCount = 0;
+let microphoneSampleRate = null;
+let microphoneCapturing = false;
+let microphoneSampleLimitReached = false;
+let microphoneRecordingFailed = false;
 let microphoneBytes = 0;
 let microphoneRecordingTooLarge = false;
 let microphoneRecordingTimer = null;
@@ -899,6 +910,22 @@ function stopMicrophoneTracks() {
     clearTimeout(microphoneRecordingTimer);
     microphoneRecordingTimer = null;
   }
+  microphoneCapturing = false;
+  if (microphoneAudioProcessor) {
+    microphoneAudioProcessor.onaudioprocess = null;
+    microphoneAudioProcessor.disconnect();
+    microphoneAudioProcessor = null;
+  }
+  microphoneAudioSource?.disconnect();
+  microphoneAudioSource = null;
+  microphoneAudioGain?.disconnect();
+  microphoneAudioGain = null;
+  if (microphoneAudioContext) {
+    void microphoneAudioContext.close().catch((error) => {
+      console.error("Failed to close microphone audio context:", error);
+    });
+    microphoneAudioContext = null;
+  }
   microphoneStream?.getTracks().forEach((track) => track.stop());
   microphoneStream = null;
 }
@@ -913,6 +940,13 @@ async function startMicrophoneCapture() {
     microphoneStartButton.disabled = true;
     if (microphoneStatus) microphoneStatus.textContent = "Requesting microphone permission…";
 
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      throw new Error("This browser does not support Web Audio microphone capture.");
+    }
+
+    microphoneAudioContext = new AudioContextClass();
+    await microphoneAudioContext.resume();
     microphoneStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: feedbackSuppressionEnabled,
@@ -921,6 +955,38 @@ async function startMicrophoneCapture() {
         channelCount: 1,
       },
     });
+
+    microphoneSampleRate = microphoneAudioContext.sampleRate;
+    microphoneSampleChunks = [];
+    microphoneSampleCount = 0;
+    microphoneSampleLimitReached = false;
+    microphoneRecordingFailed = false;
+    microphoneAudioSource =
+      microphoneAudioContext.createMediaStreamSource(microphoneStream);
+    microphoneAudioProcessor =
+      microphoneAudioContext.createScriptProcessor(4096, 1, 1);
+    microphoneAudioGain = microphoneAudioContext.createGain();
+    microphoneAudioGain.gain.value = 0;
+    microphoneAudioProcessor.onaudioprocess = (event) => {
+      if (!microphoneCapturing) return;
+      const channel = event.inputBuffer.getChannelData(0);
+      if (
+        microphoneSampleCount + channel.length > MAX_AUDIO_SAMPLE_COUNT ||
+        microphoneSampleCount + channel.length >
+          microphoneSampleRate * MAX_AUDIO_DURATION_SECONDS
+      ) {
+        microphoneSampleLimitReached = true;
+        microphoneCapturing = false;
+        if (microphoneRecorder?.state === "recording") microphoneRecorder.stop();
+        return;
+      }
+
+      microphoneSampleChunks.push(channel.slice());
+      microphoneSampleCount += channel.length;
+    };
+    microphoneAudioSource.connect(microphoneAudioProcessor);
+    microphoneAudioProcessor.connect(microphoneAudioGain);
+    microphoneAudioGain.connect(microphoneAudioContext.destination);
 
     const mimeCandidates = [
       "audio/webm;codecs=opus",
@@ -952,38 +1018,92 @@ async function startMicrophoneCapture() {
     });
 
     microphoneRecorder.addEventListener("error", (event) => {
+      microphoneRecordingFailed = true;
       showErrorMessage(event.error?.message || "Microphone recording failed.");
       stopMicrophoneTracks();
       updateMicrophoneControls(false);
+      microphoneChunks = [];
+      microphoneSampleChunks = [];
+      microphoneSampleCount = 0;
     });
 
     microphoneRecorder.addEventListener("stop", async () => {
       stopMicrophoneTracks();
       updateMicrophoneControls(false);
 
+      if (microphoneRecordingFailed) {
+        microphoneRecordingFailed = false;
+        microphoneChunks = [];
+        microphoneSampleChunks = [];
+        microphoneSampleCount = 0;
+        return;
+      }
+
+      if (microphoneSampleLimitReached) {
+        showErrorMessage("Microphone recording exceeded the supported decoding duration or sample limit.");
+        if (microphoneStatus) microphoneStatus.textContent = "Recording stopped: decoding limit reached.";
+        microphoneChunks = [];
+        microphoneSampleChunks = [];
+        return;
+      }
+
       if (microphoneRecordingTooLarge) {
         showErrorMessage("Microphone recording exceeded the 50 MB limit.");
         if (microphoneStatus) microphoneStatus.textContent = "Recording stopped: size limit reached.";
+        microphoneChunks = [];
+        microphoneSampleChunks = [];
         return;
       }
 
       const mime = microphoneRecorder?.mimeType || microphoneChunks[0]?.type || "audio/webm";
       const recording = new Blob(microphoneChunks, { type: mime });
       microphoneChunks = [];
+      const samples = mergeAudioChunks(microphoneSampleChunks);
+      microphoneSampleChunks = [];
+      microphoneSampleCount = 0;
       if (!recording.size) {
         showErrorMessage("No microphone audio was captured.");
         return;
       }
+      if (samples.length === 0 || !microphoneSampleRate) {
+        showErrorMessage("No microphone audio samples were captured for decoding.");
+        return;
+      }
 
-      const extension = mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "m4a" : "webm";
-      const file = new File([recording], `microphone-recording.${extension}`, { type: mime });
-      const loaded = await handleAudioFile(file);
-      if (loaded) decodeButton.click();
+      audioLoadGeneration += 1;
+      currentSamples = samples;
+      currentSampleRate = microphoneSampleRate;
+      currentSourceFileName = "microphone-recording";
+      decodeButton.disabled = !decodeHistoryReady;
+      hideErrorMessage();
+      dropZone.classList.add("has-file");
+      audioFileNameDisplay.replaceChildren(
+        document.createTextNode("Selected file: ")
+      );
+      const selectedFileName = document.createElement("span");
+      selectedFileName.className = "font-medium text-app-accent";
+      selectedFileName.textContent = currentSourceFileName;
+      audioFileNameDisplay.append(selectedFileName);
+
+      if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+      currentAudioUrl = URL.createObjectURL(recording);
+      decodeAudioPlayback.src = currentAudioUrl;
+      decodeAudioPlayback.hidden = false;
+      decodeAudioPlayback.currentTime = 0;
+      if (microphoneStatus) {
+        microphoneStatus.textContent =
+          "Recording ready. Decoding the captured microphone audio; background noise may affect the result.";
+      }
+      if (decodeHistoryReady) decodeButton.click();
     });
 
+    microphoneCapturing = true;
     microphoneRecorder.start(250);
     updateMicrophoneControls(true);
-    if (microphoneStatus) microphoneStatus.textContent = "Recording from microphone… Press Stop & decode when finished.";
+    if (microphoneStatus) {
+      microphoneStatus.textContent =
+        "Recording from microphone… Press Stop & decode when finished. Background noise may prevent accurate decoding.";
+    }
     microphoneRecordingTimer = window.setTimeout(() => {
       if (microphoneRecorder?.state === "recording") microphoneRecorder.stop();
     }, MAX_AUDIO_DURATION_SECONDS * 1000);
