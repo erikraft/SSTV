@@ -1,10 +1,9 @@
 import {
   freqToLum,
-  parabolicPeakInterp,
   hannWindow,
-  fft,
   yuvToRgb,
 } from "../utils.js";
+import FFT from "../fft.js";
 import {
   VIS_MAP,
   COL_FMT,
@@ -24,7 +23,7 @@ class SSTVDecoder {
     onProgress,
     onStart = null,
     onLine = null,
-    cpuBudgetSeconds = 60
+    cpuBudgetSeconds = 600
   ) {
     this.samples = audioBuffer;
     this.sampleRate = sampleRate;
@@ -35,6 +34,10 @@ class SSTVDecoder {
     this.onLine = onLine;
     this.cpuBudgetSeconds = cpuBudgetSeconds;
     this.decodeDeadline = null;
+    this.hannWindows = new Map();
+    this.frequencyCoefficients = new Map();
+    this.fftInstances = new Map();
+    this.windowedSamples = new Float64Array(0);
   }
 
   async decode() {
@@ -56,23 +59,107 @@ class SSTVDecoder {
 
   _peakFreq(data, minFrequency = 1000, maxFrequency = 2600) {
     if (!data || data.length < 8) return Number.NaN;
-    const window = hannWindow(data.length);
-    const windowedData = data.map((value, index) => value * window[index]);
-    const spectrum = fft(windowedData, this.sampleRate, this.fftSize);
-    const binWidth = this.sampleRate / (2 * spectrum.length);
+    const fftSize = Math.max(
+      this.fftSize ?? 0,
+      2 ** Math.ceil(Math.log2(data.length))
+    );
+    const binWidth = this.sampleRate / fftSize;
     const firstBin = Math.max(1, Math.ceil(minFrequency / binWidth));
-    const lastBin = Math.min(spectrum.length - 2, Math.floor(maxFrequency / binWidth));
+    const lastBin = Math.min(fftSize / 2 - 2, Math.floor(maxFrequency / binWidth));
     if (firstBin > lastBin) return Number.NaN;
-    let peakBin = firstBin;
+
+    let window = this.hannWindows.get(data.length);
+    if (!window) {
+      window = new Float64Array(data.length);
+      for (let index = 0; index < data.length; index++) {
+        window[index] = 0.5 * (1 - Math.cos((2 * Math.PI * index) / (data.length - 1)));
+      }
+      this.hannWindows.set(data.length, window);
+    }
+
+    if (this.windowedSamples.length < data.length) {
+      this.windowedSamples = new Float64Array(data.length);
+    }
+    const windowedSamples = this.windowedSamples;
+    for (let index = 0; index < data.length; index++) {
+      windowedSamples[index] = data[index] * window[index];
+    }
+
+    let coefficients = this.frequencyCoefficients.get(fftSize);
+    if (!coefficients) {
+      coefficients = new Float64Array(fftSize / 2);
+      for (let bin = 0; bin < coefficients.length; bin++) {
+        coefficients[bin] = 2 * Math.cos((2 * Math.PI * bin) / fftSize);
+      }
+      this.frequencyCoefficients.set(fftSize, coefficients);
+    }
+
+    const scanFirstBin = Math.max(1, firstBin - 1);
+    const scanLastBin = Math.min(fftSize / 2 - 1, lastBin + 1);
+    let peakBin = -1;
     let peakMagnitude = -Infinity;
-    for (let bin = firstBin; bin <= lastBin; bin++) {
-      if (spectrum[bin] > peakMagnitude) {
-        peakMagnitude = spectrum[bin];
-        peakBin = bin;
+    let peakLeft = 0;
+    let peakRight = 0;
+    const scanWork = (lastBin - firstBin + 1) * data.length;
+    const fftWork = fftSize * Math.log2(fftSize);
+
+    if (scanWork >= fftWork) {
+      let cached = this.fftInstances.get(fftSize);
+      if (!cached) {
+        cached = { fft: new FFT(fftSize, this.sampleRate), input: new Float32Array(fftSize) };
+        this.fftInstances.set(fftSize, cached);
+      }
+      cached.input.fill(0);
+      cached.input.set(windowedSamples.subarray(0, data.length));
+      const spectrum = cached.fft.forward(cached.input);
+      for (let bin = firstBin; bin <= lastBin; bin++) {
+        if (spectrum[bin] > peakMagnitude) {
+          peakBin = bin;
+          peakMagnitude = spectrum[bin];
+          peakLeft = spectrum[bin - 1];
+          peakRight = spectrum[bin + 1];
+        }
+      }
+    } else {
+      let previousMagnitude = 0;
+      for (let bin = scanFirstBin; bin <= scanLastBin; bin++) {
+        const coefficient = coefficients[bin];
+        let previous = 0;
+        let previousPrevious = 0;
+        for (let index = 0; index < data.length; index++) {
+          const current =
+            coefficient * previous - previousPrevious + windowedSamples[index];
+          previousPrevious = previous;
+          previous = current;
+        }
+        const power =
+          previous * previous +
+          previousPrevious * previousPrevious -
+          coefficient * previous * previousPrevious;
+        const magnitude = Math.sqrt(Math.max(0, power));
+
+        if (bin >= firstBin && bin <= lastBin && magnitude > peakMagnitude) {
+          peakBin = bin;
+          peakMagnitude = magnitude;
+          peakLeft = previousMagnitude;
+          peakRight = 0;
+        } else if (bin === peakBin + 1) {
+          peakRight = magnitude;
+        }
+        previousMagnitude = magnitude;
       }
     }
-    if (!Number.isFinite(peakMagnitude) || peakMagnitude <= 0) return Number.NaN;
-    return parabolicPeakInterp(spectrum, peakBin) * binWidth;
+
+    if (peakBin < 0 || !Number.isFinite(peakMagnitude) || peakMagnitude <= 0) {
+      return Number.NaN;
+    }
+
+    const denominator = peakLeft - 2 * peakMagnitude + peakRight;
+    const offset =
+      Math.abs(denominator) < Number.EPSILON
+        ? 0
+        : Math.max(-0.5, Math.min(0.5, (0.5 * (peakLeft - peakRight)) / denominator));
+    return (peakBin + offset) * binWidth;
   }
 
   _tonePower(data, frequency) {
@@ -122,10 +209,10 @@ class SSTVDecoder {
     );
     for (let offset = 0; offset <= maxHeaderSearchSamples; offset += jumpSize) {
       this._throwIfCpuBudgetExceeded();
-      const f1 = this._peakFreq(this.samples.slice(offset + leader1Start, offset + leader1Start + windowSize), 1750, 2050);
-      const f2 = this._peakFreq(this.samples.slice(offset + breakStart, offset + breakStart + windowSize), 1050, 1350);
-      const f3 = this._peakFreq(this.samples.slice(offset + leader2Start, offset + leader2Start + windowSize), 1750, 2050);
-      const f4 = this._peakFreq(this.samples.slice(offset + visStart, offset + visStart + windowSize), 1050, 1350);
+      const f1 = this._peakFreq(this.samples.subarray(offset + leader1Start, offset + leader1Start + windowSize), 1750, 2050);
+      const f2 = this._peakFreq(this.samples.subarray(offset + breakStart, offset + breakStart + windowSize), 1050, 1350);
+      const f3 = this._peakFreq(this.samples.subarray(offset + leader2Start, offset + leader2Start + windowSize), 1750, 2050);
+      const f4 = this._peakFreq(this.samples.subarray(offset + visStart, offset + visStart + windowSize), 1050, 1350);
       if (
         Number.isFinite(f1) && Number.isFinite(f2) &&
         Number.isFinite(f3) && Number.isFinite(f4) &&
@@ -156,7 +243,7 @@ class SSTVDecoder {
         ) {
           let score = 0;
           for (const [windowStart, frequency] of expectedTones) {
-            const segment = this.samples.slice(
+            const segment = this.samples.subarray(
               candidate + windowStart,
               candidate + windowStart + windowSize
             );
@@ -192,7 +279,7 @@ class SSTVDecoder {
       i += searchStep
     ) {
       this._throwIfCpuBudgetExceeded();
-      const section = this.samples.slice(i, i + syncWindow);
+      const section = this.samples.subarray(i, i + syncWindow);
       const freq = this._peakFreq(section, 1050, 2450);
       if (freq > 1350) {
         const syncEnd = i + Math.floor(syncWindow / 2);
@@ -213,7 +300,7 @@ class SSTVDecoder {
       const start = visStart + i * bitSize + Math.floor((bitSize - bitWindowSize) / 2);
       const end = start + bitWindowSize;
       if (end > this.samples.length) throw new Error("SSTV VIS header is incomplete.");
-      const section = this.samples.slice(start, end);
+      const section = this.samples.subarray(start, end);
       const freq = this._peakFreq(section, 1000, 1400);
       if (!Number.isFinite(freq)) throw new Error("Could not read the SSTV VIS header.");
       visBits.push(freq <= 1200 ? 1 : 0);
@@ -301,7 +388,7 @@ class SSTVDecoder {
             return imageData;
           }
 
-          const pixelArea = this.samples.slice(pxStart, pxEnd);
+          const pixelArea = this.samples.subarray(pxStart, pxEnd);
           const freq = this._peakFreq(pixelArea, 1400, 2400);
           imageData[line][chan][px] = freqToLum(freq);
         }

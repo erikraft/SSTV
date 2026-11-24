@@ -30,6 +30,13 @@ function makeSstvHeader(visCode, sampleRate = 11025, leadingSilenceSeconds = 0.1
   return new Float32Array(samples);
 }
 
+function makeTone(frequency, sampleRate, sampleCount) {
+  return Float32Array.from(
+    { length: sampleCount },
+    (_, index) => Math.sin((2 * Math.PI * frequency * index) / sampleRate) * 0.8
+  );
+}
+
 for (const [visCode, expectedName] of [
   [8, "Robot 36"],
   [12, "Robot 72"],
@@ -61,6 +68,27 @@ test("parabolic peak interpolation estimates a fractional FFT bin", () => {
   const peak = parabolicPeakInterp(bins, 3);
   assert.ok(peak > 3);
   assert.ok(peak < 3.5);
+});
+
+test("efficient frequency estimation keeps SSTV tones accurate at supported FFT sizes", () => {
+  const sampleRate = 11025;
+  for (const fftSize of [512, 2048]) {
+    const decoder = new SSTVDecoder(new Float32Array(0), sampleRate, fftSize);
+    for (const frequency of [1150, 1900, 2300]) {
+      const tone = makeTone(frequency, sampleRate, 512);
+      assert.ok(
+        Math.abs(decoder._peakFreq(tone, 1000, 2400) - frequency) < 10,
+        `FFT ${fftSize} should estimate ${frequency} Hz accurately`
+      );
+    }
+  }
+});
+
+test("frequency estimation handles short high-sample-rate pixel windows", () => {
+  const sampleRate = 44100;
+  const decoder = new SSTVDecoder(new Float32Array(0), sampleRate, 2048);
+  const tone = makeTone(1900, sampleRate, 48);
+  assert.ok(Math.abs(decoder._peakFreq(tone, 1400, 2400) - 1900) < 20);
 });
 
 test("rejects audio without an SSTV header", async () => {
