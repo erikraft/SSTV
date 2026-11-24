@@ -96,12 +96,18 @@ function initPlayer(player) {
   const syncProgress = () => {
     const percent = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
     seek.value = String(percent);
+    seek.style.setProperty("--audio-progress", `${percent}%`);
     elapsed.textContent = formatTime(audio.currentTime);
     duration.textContent = formatTime(audio.duration);
   };
   const syncMuteState = () => {
     muteButton.setAttribute("aria-label", audio.muted ? "Unmute audio" : "Mute audio");
     volumeIcon.update(audio.muted);
+    volumeRange.value = String(audio.volume);
+    volumeRange.style.setProperty(
+      "--audio-progress",
+      `${(audio.muted ? 0 : audio.volume) * 100}%`,
+    );
   };
 
   playButton.addEventListener("click", () => {
