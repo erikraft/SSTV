@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import SSTVDecoder from "../src/sstv/decoder.js";
 import { createToneWriter } from "../src/tone-generator.js";
-import { M1 } from "../src/spec.js";
+import { M1, R36 } from "../src/spec.js";
 import { parabolicPeakInterp } from "../src/utils.js";
 
 function makeSstvHeader(visCode, sampleRate = 11025, leadingSilenceSeconds = 0.123) {
@@ -113,6 +113,88 @@ test("aligns the first Martin 1 image row after the VIS header", async () => {
   assert.ok(
     Math.abs(buffer[offset + 2] - 128) < 16,
     "blue channel should decode the 1900 Hz test tone"
+  );
+});
+
+test("rejects a 1200 Hz pulse without the required 1500 Hz porch", () => {
+  const sampleRate = 44100;
+  const samples = [];
+  const tone = createToneWriter(sampleRate, samples);
+  tone(1900, 0.025);
+  const syncStart = samples.length;
+  tone(1200, R36.SYNC_PULSE);
+  samples.push(...new Array(Math.round(R36.SYNC_PORCH * sampleRate)).fill(0));
+  tone(1900, 0.025);
+
+  const decoder = new SSTVDecoder(
+    Float32Array.from(samples),
+    sampleRate,
+    512
+  );
+  decoder.mode = R36;
+
+  assert.equal(
+    decoder._alignSync(
+      syncStart + Math.round(0.001 * sampleRate),
+      true
+    ),
+    null,
+    "silence after a 1200 Hz pulse must not be accepted as a line porch"
+  );
+});
+
+test("rejects an initial sync edge when a 1500 Hz porch is absent", () => {
+  const sampleRate = 44100;
+  const samples = [];
+  const tone = createToneWriter(sampleRate, samples);
+  tone(1200, R36.SYNC_PULSE);
+  tone(1900, R36.SYNC_PORCH);
+  tone(1200, 0.025);
+
+  const decoder = new SSTVDecoder(Float32Array.from(samples), sampleRate, 512);
+  decoder.mode = R36;
+
+  assert.equal(
+    decoder._alignSync(0, false),
+    null,
+    "a 1900 Hz scan tone must not be mistaken for the 1500 Hz porch"
+  );
+});
+
+test("sync alignment validates the 1200 Hz pulse and 1500 Hz porch edges", () => {
+  const sampleRate = 44100;
+  const samples = [];
+  const tone = createToneWriter(sampleRate, samples);
+  tone(1900, 0.025);
+  const syncStart = samples.length;
+  tone(1200, R36.SYNC_PULSE);
+  const syncEnd = samples.length;
+  tone(1500, R36.SYNC_PORCH);
+  tone(1900, 0.025);
+
+  const decoder = new SSTVDecoder(
+    Float32Array.from(samples),
+    sampleRate,
+    512
+  );
+  decoder.mode = R36;
+
+  const detectedStart = decoder._alignSync(
+    syncStart + Math.round(0.001 * sampleRate),
+    true
+  );
+  const detectedEnd = decoder._alignSync(
+    syncStart - Math.round(0.001 * sampleRate),
+    false
+  );
+
+  assert.ok(
+    Math.abs(detectedStart - syncStart) <= 2,
+    "line sync should align to the rising 1200 Hz edge"
+  );
+  assert.ok(
+    Math.abs(detectedEnd - syncEnd) <= 2,
+    "initial sync should align to the 1200-to-1500 Hz porch edge"
   );
 });
 

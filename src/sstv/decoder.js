@@ -263,38 +263,110 @@ class SSTVDecoder {
 
   _alignSync(alignStart, startOfSync = true) {
     const syncSamples = Math.round(this.mode.SYNC_PULSE * this.sampleRate);
-    const probeLength = Math.max(8, Math.round(syncSamples * 0.4));
+    const porchSamples = Math.round(this.mode.SYNC_PORCH * this.sampleRate);
+    const syncProbeLength = Math.max(8, Math.round(syncSamples * 0.4));
+    const porchProbeLength = porchSamples >= 8
+      ? Math.max(8, Math.round(porchSamples * 0.75))
+      : 0;
     const searchRadius = startOfSync
       ? Math.round(Math.max(0.02, this.mode.SYNC_PULSE * 2) * this.sampleRate)
-      : Math.round(2 * this.mode.LINE_TIME * this.sampleRate);
-    const searchStart = startOfSync
-      ? Math.max(probeLength, alignStart - searchRadius)
-      : Math.max(probeLength, alignStart);
+      : Math.max(1, Math.round(0.001 * this.sampleRate));
+    const expectedBoundary = startOfSync
+      ? alignStart
+      : alignStart + syncSamples;
+    const searchStart = Math.max(
+      syncProbeLength,
+      expectedBoundary - searchRadius
+    );
     const searchStop = Math.min(
-      this.samples.length - probeLength,
-      alignStart + (startOfSync
-        ? searchRadius
-        : 2 * this.mode.LINE_TIME * this.sampleRate)
+      this.samples.length - (startOfSync
+        ? syncSamples + porchProbeLength
+        : porchProbeLength),
+      expectedBoundary + searchRadius
     );
 
     if (searchStop <= searchStart) return null;
 
+    const contrast = (expectedPower, competingPower) => {
+      const total = expectedPower + competingPower;
+      if (!Number.isFinite(total) || total <= Number.EPSILON) return -1;
+      return (expectedPower - competingPower) / total;
+    };
+
+    const dominantToneScore = (data, expectedFrequency, alternatives) => {
+      const expectedPower = this._tonePower(data, expectedFrequency);
+      let competingPower = 0;
+      for (const frequency of alternatives) {
+        competingPower = Math.max(
+          competingPower,
+          this._tonePower(data, frequency)
+        );
+      }
+      return contrast(expectedPower, competingPower);
+    };
+
     const scoreAt = (candidate) => {
-      const before = this.samples.subarray(
-        candidate - probeLength,
+      if (startOfSync) {
+        // A line begins with 1200 Hz sync, followed by the 1500 Hz porch.
+        const before = this.samples.subarray(
+          candidate - syncProbeLength,
+          candidate
+        );
+        const sync = this.samples.subarray(
+          candidate,
+          candidate + syncProbeLength
+        );
+        const syncToneScore = dominantToneScore(
+          sync,
+          1200,
+          [1500, 1900, 2300]
+        );
+        const transitionScore = contrast(
+          this._tonePower(sync, 1200),
+          this._tonePower(before, 1200)
+        );
+        if (transitionScore < 0.15 || syncToneScore < 0.15) return -1;
+
+        if (porchProbeLength === 0) return transitionScore;
+        const porchInset = Math.max(0, Math.floor((porchSamples - porchProbeLength) / 2));
+        const porchStart = candidate + syncSamples + porchInset;
+        const porch = this.samples.subarray(
+          porchStart,
+          porchStart + porchProbeLength
+        );
+        const porchScore = dominantToneScore(
+          porch,
+          1500,
+          [1200, 1900, 2300]
+        );
+        if (porchScore < 0.15) return -1;
+        return transitionScore * 0.65 + porchScore * 0.35;
+      }
+
+      // Scottie modes have an initial sync immediately after the VIS stop
+      // tone. That stop tone and the first sync are both 1200 Hz, so their
+      // boundary is not observable. Align to the 1200 -> 1500 porch edge.
+      const sync = this.samples.subarray(
+        candidate - syncProbeLength,
         candidate
       );
-      const after = this.samples.subarray(
+      if (porchProbeLength === 0) return -1;
+      const porch = this.samples.subarray(
         candidate,
-        candidate + probeLength
+        candidate + porchProbeLength
       );
-      const beforePower = this._tonePower(before, 1200);
-      const afterPower = this._tonePower(after, 1200);
-      const totalPower = beforePower + afterPower;
-      if (!Number.isFinite(totalPower) || totalPower <= Number.EPSILON) {
-        return -1;
-      }
-      return (afterPower - beforePower) / totalPower;
+      const syncScore = dominantToneScore(
+        sync,
+        1200,
+        [1500, 1900, 2300]
+      );
+      const porchScore = dominantToneScore(
+        porch,
+        1500,
+        [1200, 1900, 2300]
+      );
+      if (syncScore < 0.15 || porchScore < 0.15) return -1;
+      return syncScore * 0.65 + porchScore * 0.35;
     };
 
     let bestCandidate = null;
@@ -314,7 +386,7 @@ class SSTVDecoder {
       }
     }
 
-    if (bestCandidate === null || bestScore < 0.15) return null;
+    if (bestCandidate === null || bestScore < 0.25) return null;
 
     const refineStart = Math.max(searchStart, bestCandidate - searchStep);
     const refineStop = Math.min(searchStop, bestCandidate + searchStep);
@@ -327,11 +399,8 @@ class SSTVDecoder {
       }
     }
 
-    return startOfSync
-      ? bestCandidate
-      : bestCandidate + syncSamples;
+    return bestCandidate;
   }
-
   _decodeVIS(visStart) {
     const bitSize = Math.round(VIS_BIT_SIZE * this.sampleRate);
     const visBits = [];
