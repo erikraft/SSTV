@@ -1,4 +1,4 @@
-import { createToneWriter, applyTransmissionEdgeFade } from "./tone-generator.js";
+import { encodeSstvSamples } from "./sstv/encoder.js";
 import {
   readImageDimensions,
   MAX_IMAGE_FILE_SIZE,
@@ -194,49 +194,10 @@ button.addEventListener("click", async () => {
   try {
     const rate = 11025;
     const vis = Number(mode.value);
-    const scan = vis === 40 ? 0.073216 : 0.146432;
-    const pixel = scan / 320;
-    const samples = [];
-    const tone = createToneWriter(rate, samples);
-
-    tone(1900, 0.3);
-    tone(1200, 0.01);
-    tone(1900, 0.3);
-    tone(1200, 0.03);
-
-    let parity = 0;
-    for (let bit = 0; bit < 7; bit++) {
-      const one = (vis >> bit) & 1;
-      parity ^= one;
-      tone(one ? 1100 : 1300, 0.03);
-    }
-
-    tone(parity ? 1100 : 1300, 0.03);
-    tone(1200, 0.03);
 
     renderImagePreview();
-    const data = ctx.getImageData(0, 0, 320, 256).data;
-    const scanChannel = (y, channel) => {
-      for (let x = 0; x < 320; x++) {
-        tone(
-          1500 + (data[(y * 320 + x) * 4 + channel] / 255) * 800,
-          pixel
-        );
-      }
-    };
-
-    for (let y = 0; y < 256; y++) {
-      tone(1200, 0.004862);
-      tone(1500, 0.000572);
-      scanChannel(y, 1);
-      tone(1500, 0.000572);
-      scanChannel(y, 2);
-      tone(1500, 0.000572);
-      scanChannel(y, 0);
-      tone(1500, 0.000572);
-    }
-
-    applyTransmissionEdgeFade(samples, rate);
+    const imageData = ctx.getImageData(0, 0, 320, 256);
+    const samples = encodeSstvSamples(imageData, vis, rate);
     const blob = makeWav(samples, rate);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(blob);
