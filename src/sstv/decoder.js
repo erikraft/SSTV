@@ -17,7 +17,15 @@ import {
 } from "../spec.js";
 
 class SSTVDecoder {
-  constructor(audioBuffer, sampleRate, fftSize = null, onProgress, onStart = null, onLine = null) {
+  constructor(
+    audioBuffer,
+    sampleRate,
+    fftSize = null,
+    onProgress,
+    onStart = null,
+    onLine = null,
+    cpuBudgetSeconds = 60
+  ) {
     this.samples = audioBuffer;
     this.sampleRate = sampleRate;
     this.fftSize = fftSize;
@@ -25,10 +33,15 @@ class SSTVDecoder {
     this.onProgress = onProgress;
     this.onStart = onStart;
     this.onLine = onLine;
+    this.cpuBudgetSeconds = cpuBudgetSeconds;
+    this.decodeDeadline = null;
   }
 
   async decode() {
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    this.decodeDeadline = now + this.cpuBudgetSeconds * 1000;
     const headerEnd = this._findHeader();
+    this._throwIfCpuBudgetExceeded();
     if (this.onProgress) this.onProgress(5);
 
     this.mode = this._decodeVIS(headerEnd);
@@ -83,6 +96,14 @@ class SSTVDecoder {
     return Number.isFinite(power) ? Math.max(0, power) : 0;
   }
 
+  _throwIfCpuBudgetExceeded() {
+    if (this.decodeDeadline === null) return;
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    if (now >= this.decodeDeadline) {
+      throw new Error("SSTV decoding CPU time limit reached.");
+    }
+  }
+
   _findHeader() {
     const headerSize = Math.round(HDR_SIZE * this.sampleRate);
     const windowSize = Math.round(HDR_WINDOW_SIZE * this.sampleRate);
@@ -95,7 +116,12 @@ class SSTVDecoder {
     const leader2Start = centeredWindowStart(LEADER_OFFSET, VIS_START_OFFSET);
     const visStart = centeredWindowStart(VIS_START_OFFSET, HDR_SIZE);
 
-    for (let offset = 0; offset <= this.samples.length - headerSize; offset += jumpSize) {
+    const maxHeaderSearchSamples = Math.min(
+      this.samples.length - headerSize,
+      Math.round(60 * this.sampleRate)
+    );
+    for (let offset = 0; offset <= maxHeaderSearchSamples; offset += jumpSize) {
+      this._throwIfCpuBudgetExceeded();
       const f1 = this._peakFreq(this.samples.slice(offset + leader1Start, offset + leader1Start + windowSize), 1750, 2050);
       const f2 = this._peakFreq(this.samples.slice(offset + breakStart, offset + breakStart + windowSize), 1050, 1350);
       const f3 = this._peakFreq(this.samples.slice(offset + leader2Start, offset + leader2Start + windowSize), 1750, 2050);
@@ -150,11 +176,22 @@ class SSTVDecoder {
 
   _alignSync(alignStart, startOfSync = true) {
     const syncWindow = Math.round(this.mode.SYNC_PULSE * 1.4 * this.sampleRate);
-    const alignStop = this.samples.length - syncWindow;
+    const searchRadius = Math.round(2 * this.mode.LINE_TIME * this.sampleRate);
+    const alignStartBounded = Math.max(0, alignStart - searchRadius);
+    const alignStop = Math.min(
+      this.samples.length - syncWindow,
+      alignStart + searchRadius
+    );
 
     if (alignStop <= alignStart) return null;
 
-    for (let i = alignStart; i < alignStop; i++) {
+    const searchStep = Math.max(1, Math.round(0.001 * this.sampleRate));
+    for (
+      let i = alignStartBounded;
+      i < alignStop;
+      i += searchStep
+    ) {
+      this._throwIfCpuBudgetExceeded();
       const section = this.samples.slice(i, i + syncWindow);
       const freq = this._peakFreq(section, 1050, 2450);
       if (freq > 1350) {
@@ -222,6 +259,7 @@ class SSTVDecoder {
     }
 
     for (let line = 0; line < height; line++) {
+      this._throwIfCpuBudgetExceeded();
       if (this.onProgress && line % 5 === 0) {
         const percent = 10 + Math.round((line / height) * 90);
         this.onProgress(percent);

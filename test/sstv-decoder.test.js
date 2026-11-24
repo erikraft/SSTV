@@ -86,3 +86,16 @@ test("keeps the correct header origin when the recording starts with the SSTV le
   const headerEnd = decoder._findHeader();
   assert.ok(Math.abs(headerEnd / sampleRate - 0.64) < 0.001);
 });
+
+test("rejects decoding immediately when the CPU budget is exhausted", async () => {
+  const decoder = new SSTVDecoder(
+    makeSstvHeader(44, 11025),
+    11025,
+    512,
+    null,
+    null,
+    null,
+    0
+  );
+  await assert.rejects(() => decoder.decode(), /CPU time limit/);
+});
