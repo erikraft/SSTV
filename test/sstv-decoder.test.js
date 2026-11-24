@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import SSTVDecoder from "../src/sstv/decoder.js";
+import { createToneWriter } from "../src/tone-generator.js";
+import { M1 } from "../src/spec.js";
 import { parabolicPeakInterp } from "../src/utils.js";
 
 function makeSstvHeader(visCode, sampleRate = 11025, leadingSilenceSeconds = 0.123) {
@@ -37,6 +39,38 @@ function makeTone(frequency, sampleRate, sampleCount) {
   );
 }
 
+function makeMartin1FirstLine(sampleRate = 11025, leadingSilenceSeconds = 0.123) {
+  const visCode = 44;
+  const samples = new Array(Math.round(sampleRate * leadingSilenceSeconds)).fill(0);
+  const tone = createToneWriter(sampleRate, samples);
+
+  tone(1900, 0.3);
+  tone(1200, 0.01);
+  tone(1900, 0.3);
+  tone(1200, 0.03);
+
+  let parity = 0;
+  for (let bit = 0; bit < 7; bit++) {
+    const value = (visCode >> bit) & 1;
+    parity ^= value;
+    tone(value ? 1100 : 1300, 0.03);
+  }
+  tone(parity ? 1100 : 1300, 0.03);
+  tone(1200, 0.03);
+
+  // Distinct, constant channels make a bad header-to-image alignment obvious.
+  tone(1200, M1.SYNC_PULSE);
+  tone(1500, M1.SYNC_PORCH);
+  for (const frequency of [1500, 1900, 2300]) {
+    for (let pixel = 0; pixel < M1.LINE_WIDTH; pixel++) {
+      tone(frequency, M1.PIXEL_TIME);
+    }
+    tone(1500, M1.SEP_PULSE);
+  }
+
+  return Float32Array.from(samples);
+}
+
 for (const [visCode, expectedName] of [
   [8, "Robot 36"],
   [12, "Robot 72"],
@@ -62,6 +96,25 @@ for (const [visCode, expectedName] of [
     assert.equal(detectedMode, expectedName);
   });
 }
+
+test("aligns the first Martin 1 image row after the VIS header", async () => {
+  const sampleRate = 11025;
+  const decoder = new SSTVDecoder(
+    makeMartin1FirstLine(sampleRate),
+    sampleRate,
+    512
+  );
+  const { buffer, width } = await decoder.decode();
+  const offset = 160 * 4;
+
+  assert.equal(width, 320);
+  assert.ok(buffer[offset] > 240, "red channel should decode the 2300 Hz test tone");
+  assert.ok(buffer[offset + 1] < 20, "green channel should decode the 1500 Hz test tone");
+  assert.ok(
+    Math.abs(buffer[offset + 2] - 128) < 16,
+    "blue channel should decode the 1900 Hz test tone"
+  );
+});
 
 test("parabolic peak interpolation estimates a fractional FFT bin", () => {
   const bins = new Float64Array([0, 2, 6, 10, 8, 1, 0]);
