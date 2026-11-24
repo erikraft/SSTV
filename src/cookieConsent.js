@@ -1,7 +1,15 @@
 import { run } from "vanilla-cookieconsent";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
-import { getAnalyticsCategory } from "./analyticsConsent.js";
+import {
+  getAnalyticsCategory,
+  syncAnalyticsWithConsent,
+} from "./analyticsConsent.js";
 import { onCookiePreferencesUpdated } from "./theme.js";
+
+function onCookieConsentUpdated() {
+  onCookiePreferencesUpdated();
+  syncAnalyticsWithConsent();
+}
 
 export function initCookieConsent() {
   return run({
@@ -79,7 +87,7 @@ export function initCookieConsent() {
         },
       },
     },
-    onConsent: onCookiePreferencesUpdated,
-    onChange: onCookiePreferencesUpdated,
+    onConsent: onCookieConsentUpdated,
+    onChange: onCookieConsentUpdated,
   });
 }
