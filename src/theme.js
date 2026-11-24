@@ -35,14 +35,15 @@ function applyTheme(mode) {
 }
 
 function setTheme(mode) {
-  if (CookieConsent.acceptedCategory("preferences")) {
+  const canSavePreference = CookieConsent.acceptedCategory("preferences");
+  if (canSavePreference) {
     try {
       localStorage.setItem(STORAGE_KEY, mode);
     } catch {
       /* ignore */
     }
   }
-  applyTheme(mode);
+  applyTheme(!canSavePreference && mode === "system" ? "light" : mode);
 }
 
 function syncThemeWithConsent() {
@@ -55,7 +56,7 @@ function syncThemeWithConsent() {
   } catch {
     /* ignore */
   }
-  applyTheme("system");
+  applyTheme("light");
 }
 
 export function onCookiePreferencesUpdated() {
@@ -66,4 +67,4 @@ buttons.forEach((btn) => {
   btn.addEventListener("click", () => setTheme(btn.dataset.themeValue));
 });
 
-applyTheme("system");
+applyTheme("light");
