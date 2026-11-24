@@ -97,6 +97,14 @@
 	width: 4.5rem;
 }
 
+.sstv-audio-player__icon {
+	display: block;
+	width: 1rem;
+	height: 1rem;
+	fill: currentColor;
+	pointer-events: none;
+}
+
 .sstv-audio-player__audio {
 	display: none;
 }
