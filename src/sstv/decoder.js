@@ -264,7 +264,13 @@ class SSTVDecoder {
   _alignSync(alignStart, startOfSync = true) {
     const syncWindow = Math.round(this.mode.SYNC_PULSE * 1.4 * this.sampleRate);
     const searchRadius = Math.round(2 * this.mode.LINE_TIME * this.sampleRate);
-    const alignStartBounded = Math.max(0, alignStart - searchRadius);
+    // Keep the look-behind local to the expected pulse. Searching two full
+    // lines backwards can mistake the 1900 Hz VIS leader for image sync.
+    const syncSearchLookBehind = Math.min(
+      searchRadius,
+      Math.max(Math.round(syncWindow * 2), Math.round(0.01 * this.sampleRate))
+    );
+    const alignStartBounded = Math.max(0, alignStart - syncSearchLookBehind);
     const alignStop = Math.min(
       this.samples.length - syncWindow,
       alignStart + searchRadius
