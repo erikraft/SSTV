@@ -262,39 +262,74 @@ class SSTVDecoder {
   }
 
   _alignSync(alignStart, startOfSync = true) {
-    const syncWindow = Math.round(this.mode.SYNC_PULSE * 1.4 * this.sampleRate);
-    const searchRadius = Math.round(2 * this.mode.LINE_TIME * this.sampleRate);
-    // Keep the look-behind local to the expected pulse. Searching two full
-    // lines backwards can mistake the 1900 Hz VIS leader for image sync.
-    const syncSearchLookBehind = Math.min(
-      searchRadius,
-      Math.max(Math.round(syncWindow * 2), Math.round(0.01 * this.sampleRate))
-    );
-    const alignStartBounded = Math.max(0, alignStart - syncSearchLookBehind);
-    const alignStop = Math.min(
-      this.samples.length - syncWindow,
-      alignStart + searchRadius
+    const syncSamples = Math.round(this.mode.SYNC_PULSE * this.sampleRate);
+    const probeLength = Math.max(8, Math.round(syncSamples * 0.4));
+    const searchRadius = startOfSync
+      ? Math.round(Math.max(0.02, this.mode.SYNC_PULSE * 2) * this.sampleRate)
+      : Math.round(2 * this.mode.LINE_TIME * this.sampleRate);
+    const searchStart = startOfSync
+      ? Math.max(probeLength, alignStart - searchRadius)
+      : Math.max(probeLength, alignStart);
+    const searchStop = Math.min(
+      this.samples.length - probeLength,
+      alignStart + (startOfSync
+        ? searchRadius
+        : 2 * this.mode.LINE_TIME * this.sampleRate)
     );
 
-    if (alignStop <= alignStart) return null;
+    if (searchStop <= searchStart) return null;
 
-    const searchStep = Math.max(1, Math.round(0.001 * this.sampleRate));
+    const scoreAt = (candidate) => {
+      const before = this.samples.subarray(
+        candidate - probeLength,
+        candidate
+      );
+      const after = this.samples.subarray(
+        candidate,
+        candidate + probeLength
+      );
+      const beforePower = this._tonePower(before, 1200);
+      const afterPower = this._tonePower(after, 1200);
+      const totalPower = beforePower + afterPower;
+      if (!Number.isFinite(totalPower) || totalPower <= Number.EPSILON) {
+        return -1;
+      }
+      return (afterPower - beforePower) / totalPower;
+    };
+
+    let bestCandidate = null;
+    let bestScore = -Infinity;
+    const searchStep = Math.max(1, Math.round(0.00025 * this.sampleRate));
+
     for (
-      let i = alignStartBounded;
-      i < alignStop;
-      i += searchStep
+      let candidate = searchStart;
+      candidate <= searchStop;
+      candidate += searchStep
     ) {
       this._throwIfCpuBudgetExceeded();
-      const section = this.samples.subarray(i, i + syncWindow);
-      const freq = this._peakFreq(section, 1050, 2450);
-      if (freq > 1350) {
-        const syncEnd = i + Math.floor(syncWindow / 2);
-        return startOfSync
-          ? syncEnd - Math.round(this.mode.SYNC_PULSE * this.sampleRate)
-          : syncEnd;
+      const score = scoreAt(candidate);
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
       }
     }
-    return null;
+
+    if (bestCandidate === null || bestScore < 0.15) return null;
+
+    const refineStart = Math.max(searchStart, bestCandidate - searchStep);
+    const refineStop = Math.min(searchStop, bestCandidate + searchStep);
+    for (let candidate = refineStart; candidate <= refineStop; candidate++) {
+      this._throwIfCpuBudgetExceeded();
+      const score = scoreAt(candidate);
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
+      }
+    }
+
+    return startOfSync
+      ? bestCandidate
+      : bestCandidate + syncSamples;
   }
 
   _decodeVIS(visStart) {
@@ -368,8 +403,14 @@ class SSTVDecoder {
           if (line > 0 || chan > 0) {
             seqStart += Math.round(mode.LINE_TIME * this.sampleRate);
           }
-          const aligned = this._alignSync(seqStart);
-          if (aligned !== null) seqStart = aligned;
+          // The first Martin/Robot sync starts immediately after the known VIS
+          // stop bit, so its position is already exact. Only align later lines,
+          // or modes that carry an initial scan before their first sync pulse.
+          const shouldAlignSync = line > 0 || chan > 0 || mode.HAS_START_SYNC;
+          if (shouldAlignSync) {
+            const aligned = this._alignSync(seqStart);
+            if (aligned !== null) seqStart = aligned;
+          }
         }
 
         for (let px = 0; px < width; px++) {
