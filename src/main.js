@@ -14,3 +14,5 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
+import "./liquid-glass.css";
+import "./liquid-glass.js";
