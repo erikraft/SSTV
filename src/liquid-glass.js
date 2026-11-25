@@ -16,6 +16,7 @@
   const TARGETS = [
     "[data-liquid-glass]",
     "body > header",
+    "body > div > header",
     "header.site-header",
     ".header-container",
     "header.topbar",
@@ -234,6 +235,7 @@
 
   function render(state) {
     const element = state.element;
+    if (REDUCED_TRANSPARENCY?.matches || states.get(element) !== state) return;
     if (!element.isConnected) return;
     const rect = element.getBoundingClientRect();
     const width = Math.round(rect.width);
@@ -288,7 +290,7 @@
     : null;
 
   function register(element) {
-    if (!(element instanceof HTMLElement) || states.has(element)) return;
+    if (REDUCED_TRANSPARENCY?.matches || !(element instanceof HTMLElement) || states.has(element)) return;
     const state = {
       element,
       id: "erikraft-liquid-glass-" + (++nextFilterId),
