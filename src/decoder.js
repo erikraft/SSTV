@@ -17,7 +17,11 @@ const audioInput = document.getElementById("audioInput");
 const microphoneStartButton = document.getElementById("microphoneStartButton");
 const microphoneStopButton = document.getElementById("microphoneStopButton");
 const feedbackSuppressionButton = document.getElementById("feedbackSuppressionButton");
+const feedbackSuppressionLabel = document.getElementById("feedbackSuppressionLabel");
 const microphoneStatus = document.getElementById("microphoneStatus");
+const microphoneRecordingState = document.getElementById("microphoneRecordingState");
+const microphoneRecordingTime = document.getElementById("microphoneRecordingTime");
+const microphoneControls = document.querySelector(".microphone-controls__actions");
 const decodeAudioPlayback = document.getElementById("decodeAudioPlayback");
 const playAudioWhileDecoding = document.getElementById("playAudioWhileDecoding");
 const dropZone = document.getElementById("dropZone");
@@ -53,7 +57,10 @@ let microphoneRecordingFailed = false;
 let microphoneBytes = 0;
 let microphoneRecordingTooLarge = false;
 let microphoneRecordingTimer = null;
-let feedbackSuppressionEnabled = true;
+let microphoneRecordingClockTimer = null;
+let microphoneRecordingStartedAt = 0;
+let microphoneDecodePending = false;
+let feedbackSuppressionEnabled = false;
 
 function showErrorMessage(message) {
   const messageText = document.createElement("span");
@@ -569,6 +576,7 @@ async function initDecodeHistory() {
     decodeHistoryReady = true;
     if (currentSamples && currentSampleRate) {
       decodeButton.disabled = false;
+      if (microphoneDecodePending) startDecode();
     }
   }
 }
@@ -800,6 +808,7 @@ dropZone.addEventListener("drop", (event) => {
 
 async function handleAudioFile(file) {
   const loadGeneration = ++audioLoadGeneration;
+  microphoneDecodePending = false;
   currentSamples = null;
   currentSampleRate = null;
   decodeButton.disabled = true;
@@ -903,12 +912,29 @@ async function handleAudioFile(file) {
 function updateMicrophoneControls(isRecording) {
   if (microphoneStartButton) microphoneStartButton.disabled = isRecording;
   if (microphoneStopButton) microphoneStopButton.disabled = !isRecording;
+  microphoneControls?.classList.toggle("is-recording", isRecording);
+  if (microphoneRecordingState) {
+    microphoneRecordingState.textContent = isRecording ? "RECORDING" : "READY";
+  }
+}
+
+function updateMicrophoneRecordingTime() {
+  if (!microphoneRecordingTime || !microphoneRecordingStartedAt) return;
+  const elapsed = Math.floor((performance.now() - microphoneRecordingStartedAt) / 1000);
+  const minutes = Math.floor(elapsed / 60).toString().padStart(2, "0");
+  const seconds = (elapsed % 60).toString().padStart(2, "0");
+  microphoneRecordingTime.textContent = `${minutes}:${seconds}`;
 }
 
 function stopMicrophoneTracks() {
   if (microphoneRecordingTimer !== null) {
     clearTimeout(microphoneRecordingTimer);
     microphoneRecordingTimer = null;
+  }
+  if (microphoneRecordingClockTimer !== null) {
+    clearInterval(microphoneRecordingClockTimer);
+    microphoneRecordingClockTimer = null;
+    updateMicrophoneRecordingTime();
   }
   microphoneCapturing = false;
   if (microphoneAudioProcessor) {
@@ -961,6 +987,9 @@ async function startMicrophoneCapture() {
     microphoneSampleCount = 0;
     microphoneSampleLimitReached = false;
     microphoneRecordingFailed = false;
+    microphoneRecordingStartedAt = performance.now();
+    if (microphoneRecordingTime) microphoneRecordingTime.textContent = "00:00";
+    microphoneRecordingClockTimer = window.setInterval(updateMicrophoneRecordingTime, 250);
     microphoneAudioSource =
       microphoneAudioContext.createMediaStreamSource(microphoneStream);
     microphoneAudioProcessor =
@@ -1094,7 +1123,8 @@ async function startMicrophoneCapture() {
         microphoneStatus.textContent =
           "Recording ready. Decoding the captured microphone audio; background noise may affect the result.";
       }
-      if (decodeHistoryReady) decodeButton.click();
+      microphoneDecodePending = !decodeHistoryReady;
+      if (decodeHistoryReady) startDecode();
     });
 
     microphoneCapturing = true;
@@ -1129,9 +1159,11 @@ microphoneStopButton?.addEventListener("click", () => {
 feedbackSuppressionButton?.addEventListener("click", async () => {
   feedbackSuppressionEnabled = !feedbackSuppressionEnabled;
   feedbackSuppressionButton.setAttribute("aria-pressed", String(feedbackSuppressionEnabled));
-  feedbackSuppressionButton.textContent = feedbackSuppressionEnabled
-    ? "Feedback suppression: ON"
-    : "Feedback suppression: OFF";
+  if (feedbackSuppressionLabel) {
+    feedbackSuppressionLabel.textContent = feedbackSuppressionEnabled
+      ? "Feedback suppression: ON"
+      : "Feedback suppression: OFF";
+  }
 
   const track = microphoneStream?.getAudioTracks()[0];
   if (track) {
@@ -1152,9 +1184,10 @@ window.addEventListener("beforeunload", () => {
   if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
 });
 
-decodeButton.addEventListener("click", () => {
+function startDecode() {
   if (!currentSamples || !currentSampleRate || !decodeHistoryReady) return;
 
+  microphoneDecodePending = false;
   decodeButton.disabled = true;
   hideErrorMessage();
   showDecodeProgress({ reset: true });
@@ -1181,7 +1214,9 @@ decodeButton.addEventListener("click", () => {
     showErrorMessage("Could not start decoding. The audio may exceed this device's available memory.");
     decodeButton.disabled = !decodeHistoryReady;
   }
-});
+}
+
+decodeButton.addEventListener("click", startDecode);
 
 decoderWorker.onmessage = (event) => {
   const data = event.data;
