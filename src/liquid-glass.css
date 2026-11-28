@@ -33,3 +33,42 @@ body > div > header {
     background-color: var(--app-surface);
   }
 }
+
+/* Optical finish follows the active light/dark tokens and keeps the lens edge visible. */
+:where(
+  body > div > header, .app-panel, .seo-doc-toc,
+  .seo-doc-table-wrap, .confirm-dialog__panel, .decode-gallery__header
+) {
+  background-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, .2) 0%,
+    rgba(255, 255, 255, .07) 32%,
+    rgba(255, 255, 255, .015) 72%,
+    rgba(255, 255, 255, .09) 100%
+  );
+  background-blend-mode: screen;
+  border-color: color-mix(in srgb, var(--app-panel-border) 65%, rgba(255,255,255,.38));
+  -webkit-backdrop-filter: blur(18px) saturate(1.65) contrast(1.04);
+  backdrop-filter: blur(18px) saturate(1.65) contrast(1.04);
+  box-shadow:
+    var(--app-panel-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, .24),
+    inset 0 -1px 0 rgba(255, 255, 255, .06);
+}
+:root.dark :where(body > div > header, .app-panel, .seo-doc-toc, .seo-doc-table-wrap, .confirm-dialog__panel, .decode-gallery__header),
+.dark :where(body > div > header, .app-panel, .seo-doc-toc, .seo-doc-table-wrap, .confirm-dialog__panel, .decode-gallery__header) {
+  background-color: rgba(18, 22, 34, .54);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :where(
+    body > div > header, .app-panel, .seo-doc-toc,
+    .seo-doc-table-wrap, .confirm-dialog__panel, .decode-gallery__header
+  ) {
+    background-image: none;
+    background-blend-mode: normal;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--app-panel-shadow);
+    background-color: var(--app-surface);
+  }
+}
